@@ -1,21 +1,26 @@
 import database.models
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from routers import apartments
-from database.db import SessionLocal, engine
+from database.db import engine
 
-
+# Create all the database models
 database.models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+# Middleware definitions go here
+origins = ["http://localhost:3000"]
 
-# Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-
-app.include_router(apartments.router)
+# Routers go here
+app.include_router(apartments.router, prefix="/api/v1")
