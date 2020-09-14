@@ -20,17 +20,18 @@ class User(Base):
 
     id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
     first_name = Column(String(50), nullable=False)
-    last_name = Column(String(50), nullable=False)
+    last_name = Column(String(50))
     email = Column(String(50), unique=True, nullable=False, index=True)
     mobile = Column(BigInteger)
     hashed_password = Column(String(200), nullable=False)
     is_active = Column(Boolean, default=True)
     apartment_id = Column(Integer, ForeignKey("apartments.id"))
+    mail_subscribed = Column(Boolean, default=True)
     created_on = Column(DateTime, default=datetime.now)
     apartment = relationship("Apartment")
 
     def __repr__(self):
-        return f"User({self.first_name} + ' ' + {self.last_name}, {self.email}, {self.is_active})"
+        return f"User({self.first_name}, {self.last_name}, {self.email}, {self.is_active})"
 
 
 class Apartment(Base):

@@ -3,7 +3,7 @@ import database.models
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import apartments
+from routers import apartments, user
 from database.db import engine
 
 # Create all the database models
@@ -24,3 +24,4 @@ app.add_middleware(
 
 # Routers go here
 app.include_router(apartments.router, prefix="/api/v1")
+app.include_router(user.router, prefix="/api/v1")

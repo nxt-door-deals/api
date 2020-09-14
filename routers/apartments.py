@@ -1,6 +1,7 @@
 from fastapi import HTTPException, Depends, status
 from database.models import Apartment
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel
 from typing import Optional, List
 from . import router, get_db
@@ -41,7 +42,13 @@ class ApartmentCreate(ApartmentBase):
 
 # Helpers
 def get_all_apartments(db: Session):
-    return db.query(Apartment).all()
+    try:
+        return db.query(Apartment).all()
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=500,
+            detail="Error encountered while fetching apartments",
+        )
 
 
 # Endpoints
@@ -50,7 +57,7 @@ def get_all_apartments(db: Session):
     response_model=List[ApartmentFetch],
     status_code=status.HTTP_200_OK,
 )
-async def get_apartments(db: Session = Depends(get_db)):
+def get_apartments(db: Session = Depends(get_db)):
     apartment = get_all_apartments(db)
 
     if not apartment:
@@ -63,16 +70,22 @@ async def get_apartments(db: Session = Depends(get_db)):
     response_model=List[ApartmentFetch],
     status_code=status.HTTP_200_OK,
 )
-async def search_apartment(name: str, db: Session = Depends(get_db)):
-    apartment = (
-        db.query(Apartment).filter(Apartment.name.ilike("%" + name + "%")).all()
-    )
+def search_apartment(name: str, db: Session = Depends(get_db)):
 
-    if not apartment:
-        raise HTTPException(
-            status_code=404, detail="No apartment matches that search criteria"
+    if name:
+        name = "%" + name + "%"
+
+    try:
+        return (
+            db.query(Apartment)
+            .filter(Apartment.name.ilike(name))
+            .limit(4)
+            .all()
         )
-    return apartment
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=500, detail="Error searching for apartments"
+        )
 
 
 @router.post(
@@ -80,17 +93,26 @@ async def search_apartment(name: str, db: Session = Depends(get_db)):
     response_model=ApartmentCreate,
     status_code=status.HTTP_201_CREATED,
 )
-async def add_apartment(
-    apartment: ApartmentCreate, db: Session = Depends(get_db)
-):
+def add_apartment(apartment: ApartmentCreate, db: Session = Depends(get_db)):
+
+    # address2 is not mandatory. Hence format only if sent in the request
+    address2 = apartment.address2.title() if apartment.address2 else None
+
     new_apartment = Apartment(
         name=apartment.name.title(),
         address1=apartment.address1.title(),
-        address2=apartment.address2.title(),
+        address2=address2,
         city=apartment.city.title(),
         state=apartment.state.title(),
         pincode=apartment.pincode,
     )
-    db.add(new_apartment)
-    db.commit()
-    return new_apartment
+
+    try:
+        db.add(new_apartment)
+        db.commit()
+        return new_apartment
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=500,
+            detail="Error encountered while adding new apartment",
+        )
