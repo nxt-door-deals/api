@@ -9,6 +9,7 @@ flake8 = "*"
 pytest = "*"
 black = "*"
 alembic = "*"
+python-multipart = "*"
 
 [packages]
 fastapi = "*"
@@ -19,6 +20,11 @@ psycopg2 = "*"
 psycopg2-binary = "*"
 python-dotenv = "*"
 passlib = "*"
+python-jose = {extras = ["cryptography"],version = "*"}
+pytz = "*"
+sendgrid = "*"
+boto3 = "*"
+requests = "*"
 
 [requires]
 python_version = "3.7"

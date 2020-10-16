@@ -19,19 +19,23 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
-    first_name = Column(String(50), nullable=False)
-    last_name = Column(String(50))
+    name = Column(String(100), nullable=False)
     email = Column(String(50), unique=True, nullable=False, index=True)
-    mobile = Column(BigInteger)
+    mobile = Column(String(15))
     hashed_password = Column(String(200), nullable=False)
     is_active = Column(Boolean, default=True)
     apartment_id = Column(Integer, ForeignKey("apartments.id"))
     mail_subscribed = Column(Boolean, default=True)
     created_on = Column(DateTime, default=datetime.now)
+    otp = Column(String(6))
+    otp_verification_timestamp = Column(DateTime)
+    email_verified = Column(Boolean, default=False)
+    email_verification_hash = Column(String(100))
+    email_verification_timestamp = Column(DateTime)
     apartment = relationship("Apartment")
 
     def __repr__(self):
-        return f"User({self.first_name}, {self.last_name}, {self.email}, {self.is_active})"
+        return f"User({self.id}, {self.name}, {self.email}, {self.is_active})"
 
 
 class Apartment(Base):

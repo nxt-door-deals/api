@@ -9,6 +9,7 @@ from . import router, get_db
 
 # Schema
 class ApartmentBase(BaseModel):
+    id: Optional[int]
     name: str
     address1: str
     address2: Optional[str] = None
@@ -84,7 +85,8 @@ def search_apartment(name: str, db: Session = Depends(get_db)):
         )
     except SQLAlchemyError:
         raise HTTPException(
-            status_code=500, detail="Error searching for apartments"
+            status_code=500,
+            detail="Error encountered while searching for apartments",
         )
 
 
