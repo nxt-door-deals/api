@@ -1,8 +1,3 @@
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
-
 from app.main import app
 from routers import apartments
 from fastapi.testclient import TestClient
