@@ -1,19 +1,20 @@
-import database.models
 from dotenv import load_dotenv
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-from routers import apartments, user, auth, heartbeat, email_messages
-from database.db import engine
 
 # Load environment variables
 load_dotenv()
 
-# Create all the database models
-database.models.Base.metadata.create_all(bind=engine)
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+from database.db import engine
+from database import models
+from routers import apartments, user, auth, heartbeat, email_messages
+
+
+# Create all the database models
+models.Base.metadata.create_all(bind=engine)
+
+app = FastAPI(docs_url=None, redoc_url=None)
 
 # Middleware definitions go here
 origins = ["http://localhost:3000"]

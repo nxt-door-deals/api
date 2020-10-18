@@ -107,16 +107,16 @@ def check_existing_user(db: Session, email: str) -> bool:
 def create_user_folders_in_s3(id: int):
     s3_resource = boto3.resource(
         "s3",
-        aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
     )
     folder_list = [f"users/{id}/profile/", f"users/{id}/ads/"]
 
     try:
         response = [
-            s3_resource.Bucket(
-                os.environ.get("AWS_STORAGE_BUCKET_NAME")
-            ).put_object(Key=folder)
+            s3_resource.Bucket(os.getenv("AWS_STORAGE_BUCKET_NAME")).put_object(
+                Key=folder
+            )
             for folder in folder_list
         ]
 

@@ -34,7 +34,7 @@ class EmailSend(BaseModel):
 
 # Helpers
 def send_message(message: Mail):
-    sg = SendGridAPIClient(os.environ.get("SENDGRID_API_KEY"))
+    sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
     sg.send(message)
 
 
