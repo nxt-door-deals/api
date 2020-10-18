@@ -1,0 +1,17 @@
+language: python
+python:
+  - "3.7"
+install:
+  - pip install pipenv
+  - pipenv install
+script:
+  - pytest
+notifications:
+  email:
+    recipients:
+      - abhi_ap@hotmail.com
+    on_success: always
+    on_failure: always
+  slack:
+    rooms:
+      secure: jcMFufxytl+E68U8U3vH2bS/VPN9nSTCHGD/rTGkhY+27ZIgeWJe0gqHm/pBy4K6phA9ivWL1XCEigPOuFIZCv40cL5LqrEdJ+dgZTjRXxfTPT8S8ofvOHImWQZRU5DAufUjrV0EbNzZAGF16vVnWljT9t0eFhMIxMyyKTUVb6Bw02Z5d0ya/DISm90+68a4gkgQ+porbTQ06IYs35ViZ8eONZuaAEHp4tsguKslH0HSqdahWsiXdTfrGEhgAWf5yNAqQKaC8cd8YrPJzoI1zkr7ixL+FIBhcgQ/A6bHCTOVbiZ7McOq4n3Dtl+HZCKIOK274IsPNTybK+46stWANrOSodmmDCRxoLI0mK5S4eLLjRIydUpHqa0tEf5HScNjBoERv1gNCSrmW+tHEns4OAxuqtpJzvxcdb0JBQnStpvxzS/s1Q0/y83iEWzDjUUFmoBf9JySjjz0SMuvEsFUSHB300L207ifEKfmWHU5YDLIZOM/bCZV6fhG9+xIMXBMtOn9K3CjDHjosEtrROWiwENyv2hs3/i573Y6yHuMvibFjdyYfRGTrb8fbiQN3XaWnByUxvmc+K/CjANohImqv34rNJNvmLaPnqSifgOhbw5nF42RW4camp0Llgu5eZZq+VsS0jGscwuDnVpi+QRZ2nWw6Yj16Il4XwtYT7oosi0=
