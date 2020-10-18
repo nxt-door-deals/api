@@ -25,7 +25,7 @@ pytz = "*"
 sendgrid = "*"
 boto3 = "*"
 requests = "*"
-multipart = "*"
+python-multipart = "*"
 
 [requires]
 python_version = "3.7"
