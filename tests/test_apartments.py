@@ -6,10 +6,10 @@ app.include_router(apartments.router)
 client = TestClient(app)
 
 
-def test_get_apartments():
-    res = client.get("/apartments/all")
-    assert res.status_code == 200
-    assert res is not None
+# def test_get_apartments():
+#     res = client.get("/apartments/all")
+#     assert res.status_code == 200
+#     assert res is not None
 
 
 def test_aparment_search():
