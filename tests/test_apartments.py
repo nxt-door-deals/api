@@ -6,17 +6,6 @@ app.include_router(apartments.router)
 client = TestClient(app)
 
 
-# def test_get_apartments():
-#     res = client.get("/apartments/all")
-#     assert res.status_code == 200
-#     assert res is not None
-
-
-def test_aparment_search():
-    res = client.get("/apartments/search/?name={rep}")
-    assert res.status_code == 200
-
-
 def test_add_apartment():
     res = client.post(
         "/apartments/add",
@@ -32,3 +21,14 @@ def test_add_apartment():
     )
     assert res.status_code == 201
     assert res.json()["name"].title() == "Republic Of Whitefield"
+
+
+def test_get_apartments():
+    res = client.get("/apartments/all")
+    assert res.status_code == 200
+    assert res is not None
+
+
+def test_aparment_search():
+    res = client.get("/apartments/search/?name={rep}")
+    assert res.status_code == 200

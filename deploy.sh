@@ -9,5 +9,3 @@ if [ $TRAVIS_BRANCH == 'main' ] ; then
 else
   echo "Not deploying, since the branch isn't main."
 fi
-
-ssh travis@68.183.94.49 'systemctl restart nginx'
