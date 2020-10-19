@@ -17,18 +17,18 @@ def test_aparment_search():
     assert res.status_code == 200
 
 
-# def test_add_apartment():
-#     res = client.post(
-#         "/apartments/add",
-#         json={
-#             "name": "Republic Of Whitefield",
-#             "address1": "EPIP Zone",
-#             "address2": "Whitefield",
-#             "city": "Bengaluru",
-#             "state": "Karnataka",
-#             "pincode": "560066",
-#         },
-#         headers={"Content-Type": "application/json"},
-#     )
-#     assert res.status_code == 201
-#     assert res.json()["name"].title() == "Republic Of Whitefield"
+def test_add_apartment():
+    res = client.post(
+        "/apartments/add",
+        json={
+            "name": "Republic Of Whitefield",
+            "address1": "EPIP Zone",
+            "address2": "Whitefield",
+            "city": "Bengaluru",
+            "state": "Karnataka",
+            "pincode": "560066",
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    assert res.status_code == 201
+    assert res.json()["name"].title() == "Republic Of Whitefield"

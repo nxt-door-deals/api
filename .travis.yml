@@ -11,6 +11,10 @@ before_install:
 install:
   - pip install pipenv
   - pipenv install
+services:
+  - postgresql
+before_script:
+  - psql -c 'create database test_postgres_db;' -U postgres
 script:
   - pytest
 after_success:
