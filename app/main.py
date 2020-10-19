@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database.db import engine
 from database import models
-from routers import apartments, user, auth, heartbeat, email_messages
+from routers import apartments, user, auth, heartbeat, email_messages, index
 
 
 # Create all the database models
@@ -30,6 +30,7 @@ app.add_middleware(
 # Routers go here
 prefix = "/api/v1"
 
+app.include_router(index.router)
 app.include_router(apartments.router, prefix=prefix)
 app.include_router(user.router, prefix=prefix)
 app.include_router(auth.router, prefix=prefix)
