@@ -1,5 +1,6 @@
 from fastapi import HTTPException, Depends, status
 from database.models import Apartment
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel
@@ -72,14 +73,13 @@ def get_apartments(db: Session = Depends(get_db)):
     status_code=status.HTTP_200_OK,
 )
 def search_apartment(name: str, db: Session = Depends(get_db)):
-
     if name:
         name = "%" + name + "%"
 
     try:
         return (
             db.query(Apartment)
-            .filter(Apartment.name.ilike(name))
+            .filter(and_(Apartment.name.ilike(name), Apartment.verified))
             .limit(4)
             .all()
         )

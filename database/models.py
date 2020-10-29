@@ -10,7 +10,6 @@ from sqlalchemy import (
     BigInteger,
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import TSVECTOR
 
 from database.db import Base
 
@@ -25,6 +24,7 @@ class User(Base):
     hashed_password = Column(String(200), nullable=False)
     is_active = Column(Boolean, default=True)
     apartment_id = Column(Integer, ForeignKey("apartments.id"))
+    apartment_number = Column(String(10), nullable=False, default="1234")
     mail_subscribed = Column(Boolean, default=True)
     created_on = Column(DateTime, default=datetime.now)
     otp = Column(String(6))
@@ -49,7 +49,7 @@ class Apartment(Base):
     state = Column(String(50), nullable=False)
     pincode = Column(String(15), nullable=False)
     verified = Column(Boolean, default=False)
-    name_token = Column(TSVECTOR)
+    submitted_by = Column(String(50))
     created_on = Column(DateTime, default=datetime.now)
 
     def __repr__(self):

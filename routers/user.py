@@ -23,6 +23,7 @@ class UserBase(BaseModel):
     name: str
     email: str
     mobile: Optional[str] = None
+    apartment_number: str
     apartment_id: int
 
     class Config:
@@ -189,6 +190,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         mobile=user.mobile,
         hashed_password=hashed_password,
         apartment_id=user.apartment_id,
+        apartment_number=user.apartment_number,
         email_verification_hash=email_verification_hash,
         email_verification_timestamp=datetime.utcnow(),
     )
@@ -217,6 +219,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         "email": new_user.email,
         "password": new_user.hashed_password,
         "apartment_id": new_user.apartment_id,
+        "apartment_number": new_user.apartment_number,
         "mobile": new_user.mobile,
         "access_token": token,
         "email_verification_hash": email_verification_hash,
