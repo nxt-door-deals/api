@@ -1,11 +1,13 @@
-from fastapi import HTTPException, Depends, status
+from typing import List, Optional
+
 from database.models import Apartment
-from sqlalchemy import and_
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
+from fastapi import Depends, HTTPException, status
 from pydantic import BaseModel
-from typing import Optional, List
-from . import router, get_db
+from sqlalchemy import and_
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from . import get_db, router
 
 
 # Schema
@@ -86,7 +88,7 @@ def search_apartment(name: str, db: Session = Depends(get_db)):
     except SQLAlchemyError:
         raise HTTPException(
             status_code=500,
-            detail="Error encountered while searching for apartments",
+            detail="Houston, we have a problem!\nCopy that, we are checking.",
         )
 
 

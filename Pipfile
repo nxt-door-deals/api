@@ -10,6 +10,7 @@ pytest = "*"
 black = "*"
 alembic = "*"
 python-multipart = "*"
+isort = "*"
 
 [packages]
 fastapi = "*"
@@ -26,6 +27,7 @@ sendgrid = "*"
 boto3 = "*"
 requests = "*"
 python-multipart = "*"
+alembic = "*"
 
 [requires]
 python_version = "3.7"

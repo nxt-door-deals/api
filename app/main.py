@@ -1,15 +1,15 @@
+import os
+
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
+from database import models
+from database.db import engine
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from database.db import engine
-from database import models
-from routers import apartments, user, auth, heartbeat, email_messages, index
-
+from routers import apartments, auth, email_messages, heartbeat, index, user
 
 # Create all the database models
 models.Base.metadata.create_all(bind=engine)
@@ -17,7 +17,7 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(docs_url=None, redoc_url=None)
 
 # Middleware definitions go here
-origins = ["http://localhost:3001", "http://127.0.0.1:3001"]
+origins = [os.getenv("CORS_ORIGIN_SERVER")]
 
 app.add_middleware(
     CORSMiddleware,

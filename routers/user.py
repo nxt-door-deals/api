@@ -1,19 +1,20 @@
-import os
 import hashlib
+import os
 import secrets
-import pytz
-import boto3
+from datetime import datetime
+from typing import Optional
 
-from . import router, get_db
-from fastapi import Depends, status, HTTPException
+import boto3
+import pytz
 from database.models import User
-from sqlalchemy.orm import Session
+from fastapi import Depends, HTTPException, status
+from passlib.hash import pbkdf2_sha256
+from pydantic import BaseModel
 from sqlalchemy import and_
 from sqlalchemy.exc import SQLAlchemyError
-from pydantic import BaseModel
-from passlib.hash import pbkdf2_sha256
-from typing import Optional
-from datetime import datetime
+from sqlalchemy.orm import Session
+
+from . import get_db, router
 from .auth import create_access_token
 
 
@@ -88,6 +89,10 @@ class UserEmailVerification(BaseModel):
 
     class Config:
         schema_extra = {"example": {"id": 1}}
+
+
+class UserOtpVerification(UserEmailVerification):
+    pass
 
 
 class UserOtpBase(BaseModel):
@@ -208,6 +213,24 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         )
 
         create_user_folders_in_s3(new_user.id)
+
+        # Once the folders are created in s3, update the paths in the table
+        bucket = os.getenv("AWS_STORAGE_BUCKET_NAME")
+        region = os.getenv("AWS_DEFAULT_REGION")
+        base_aws_s3_path = f"https://{bucket}.s3.{region}.amazonaws.com/users/"
+
+        db.query(User).filter(User.id == new_user.id).update(
+            {
+                User.profile_path: os.path.join(
+                    base_aws_s3_path, f"{new_user.id}/profile/"
+                ),
+                User.ads_path: os.path.join(
+                    base_aws_s3_path, f"{new_user.id}/ads/"
+                ),
+            }
+        )
+
+        db.commit()
     except SQLAlchemyError:
         raise HTTPException(
             status_code=500, detail="Error encountered while registering user"
@@ -374,7 +397,7 @@ def email_timestamp_refresh(
 
         db.commit()
 
-        return "Timestamp updated"
+        return "Email timestamp updated"
     except SQLAlchemyError:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -433,4 +456,23 @@ def verify_otp(
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail="The otp entered is either incorrect or has expired",
+        )
+
+
+@router.put("/otp_timestamp/refresh", status_code=status.HTTP_200_OK)
+def otp_timestamp_refresh(
+    user: UserOtpVerification, db: Session = Depends(get_db)
+):
+    try:
+        db.query(User).filter(User.id == user.id).update(
+            {User.otp_verification_timestamp: datetime.utcnow()}
+        )
+
+        db.commit()
+
+        return "Otp timestamp updated"
+    except SQLAlchemyError:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="The otp timestamp could not be updated",
         )

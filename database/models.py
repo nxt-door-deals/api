@@ -1,17 +1,17 @@
 from datetime import datetime
 
+from database.db import Base
 from sqlalchemy import (
-    Column,
-    Integer,
-    DateTime,
-    String,
-    Boolean,
-    ForeignKey,
     BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
 )
 from sqlalchemy.orm import relationship
-
-from database.db import Base
 
 
 class User(Base):
@@ -32,6 +32,9 @@ class User(Base):
     email_verified = Column(Boolean, default=False)
     email_verification_hash = Column(String(100))
     email_verification_timestamp = Column(DateTime)
+    profile_path = Column(String(500))
+    ads_path = Column(String(500))
+
     apartment = relationship("Apartment")
 
     def __repr__(self):
@@ -56,3 +59,40 @@ class Apartment(Base):
         return (
             f"Apartment({self.name}, {self.city}, {self.state}, {self.pincode})"
         )
+
+
+class Ad(Base):
+    __tablename__ = "ads"
+
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    title = Column(String(100), nullable=False)
+    description = Column(String(10000), nullable=False)
+    ad_category = Column(String(20), nullable=False, index=True)
+    ad_type = Column(String(15), nullable=False)
+    price = Column(Numeric(precision=2))
+    negotiable = Column(Boolean, default=False)
+    condition = Column(String(20))
+    available_from = Column(DateTime)
+    publish_flat_number = Column(Boolean, default=False)
+    posted_by = Column(Integer, ForeignKey("users.id"))
+    apartment_id = Column(Integer, ForeignKey("apartments.id"))
+    created_on = Column(DateTime, default=datetime.now)
+
+    user = relationship("User")
+    apartment = relationship("Apartment")
+
+    def __repr__(self):
+        return f"Ad({self.id}, {self.title})"
+
+
+class AdImage(Base):
+    __tablename__ = "adimages"
+
+    id = Column(BigInteger, primary_key=True, nullable=False, index=True)
+    ad_id = Column(Integer, ForeignKey("ads.id"))
+    image_path = Column(String(500), nullable=False)
+
+    image = relationship("Ad")
+
+    def __repr__(self):
+        return f"AdImages({self.ad_id}, {self.image_path})"
