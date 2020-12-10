@@ -5,11 +5,20 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from database import models
-from database.db import engine
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import apartments, auth, email_messages, heartbeat, index, user
+
+from database import models
+from database.db import engine
+from routers import (
+    ads,
+    apartments,
+    auth,
+    email_messages,
+    heartbeat,
+    index,
+    user,
+)
 
 # Create all the database models
 models.Base.metadata.create_all(bind=engine)
@@ -36,3 +45,4 @@ app.include_router(user.router, prefix=prefix)
 app.include_router(auth.router, prefix=prefix)
 app.include_router(heartbeat.router, prefix=prefix)
 app.include_router(email_messages.router, prefix=prefix)
+app.include_router(ads.router, prefix=prefix)

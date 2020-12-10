@@ -1,17 +1,16 @@
 from datetime import datetime
 
-from database.db import Base
-from sqlalchemy import (
-    BigInteger,
-    Boolean,
-    Column,
-    DateTime,
-    ForeignKey,
-    Integer,
-    Numeric,
-    String,
-)
+from sqlalchemy import BigInteger
+from sqlalchemy import Boolean
+from sqlalchemy import Column
+from sqlalchemy import DateTime
+from sqlalchemy import ForeignKey
+from sqlalchemy import Integer
+from sqlalchemy import Numeric
+from sqlalchemy import String
 from sqlalchemy.orm import relationship
+
+from database.db import Base
 
 
 class User(Base):
@@ -53,6 +52,7 @@ class Apartment(Base):
     pincode = Column(String(15), nullable=False)
     verified = Column(Boolean, default=False)
     submitted_by = Column(String(50))
+    verification_hash = Column(String(100))
     created_on = Column(DateTime, default=datetime.now)
 
     def __repr__(self):
@@ -67,13 +67,14 @@ class Ad(Base):
     id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
     title = Column(String(100), nullable=False)
     description = Column(String(10000), nullable=False)
-    ad_category = Column(String(20), nullable=False, index=True)
-    ad_type = Column(String(15), nullable=False)
-    price = Column(Numeric(precision=2))
+    ad_category = Column(String(50), nullable=False, index=True)
+    ad_type = Column(String(50), nullable=False)
+    price = Column(Numeric(scale=2))
     negotiable = Column(Boolean, default=False)
-    condition = Column(String(20))
+    condition = Column(String(50))
     available_from = Column(DateTime)
     publish_flat_number = Column(Boolean, default=False)
+    sold = Column(Boolean, default=False)
     posted_by = Column(Integer, ForeignKey("users.id"))
     apartment_id = Column(Integer, ForeignKey("apartments.id"))
     created_on = Column(DateTime, default=datetime.now)

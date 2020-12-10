@@ -1,20 +1,25 @@
 import os
-
-from . import router, get_db
-from datetime import datetime, timedelta
 from collections import namedtuple
-
-from fastapi import HTTPException, Depends, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from datetime import datetime
+from datetime import timedelta
 from typing import Optional
-from passlib.hash import pbkdf2_sha256
-from database.models import User, Apartment
-from jose import jwt, JWTError
 
+from fastapi import Depends
+from fastapi import HTTPException
+from fastapi import status
+from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordRequestForm
+from jose import jwt
+from jose import JWTError
+from passlib.hash import pbkdf2_sha256
+from pydantic import BaseModel
+from sqlalchemy import and_
+from sqlalchemy.orm import Session
+
+from . import get_db
+from . import router
+from database.models import Apartment
+from database.models import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth")
 
@@ -108,6 +113,9 @@ def get_current_user(
             User.email_verified,
             User.email_verification_hash,
             User.email_verification_timestamp,
+            User.apartment_id,
+            User.ads_path,
+            User.profile_path,
             Apartment.name,
         )
         .filter(
@@ -123,7 +131,7 @@ def get_current_user(
 
     CurrentUser = namedtuple(
         "CurrentUser",
-        "id name email is_active mobile mail_subscribed otp email_verified email_verification_hash email_verification_timestamp apartment_name",
+        "id name email is_active mobile mail_subscribed otp email_verified email_verification_hash email_verification_timestamp apartment_id ads_path profile_path apartment_name",
     )
 
     user_dict = CurrentUser._make(user)._asdict()
@@ -141,6 +149,9 @@ def get_current_user(
         "email_verification_timestamp": user_dict[
             "email_verification_timestamp"
         ],
+        "apartment_id": user_dict["apartment_id"],
+        "ads_path": user_dict["ads_path"],
+        "profile_path": user_dict["profile_path"],
         "apartment_name": user_dict["apartment_name"],
     }
 

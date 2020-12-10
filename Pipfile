@@ -28,6 +28,7 @@ boto3 = "*"
 requests = "*"
 python-multipart = "*"
 alembic = "*"
+pillow = "*"
 
 [requires]
 python_version = "3.7"

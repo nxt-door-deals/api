@@ -1,14 +1,20 @@
 import os
 from datetime import datetime
+from typing import Optional
 
-from . import router, get_db
-from database.models import User
-from sqlalchemy.orm import Session
-from fastapi import status, HTTPException, Depends, BackgroundTasks
+from fastapi import BackgroundTasks
+from fastapi import Depends
+from fastapi import HTTPException
+from fastapi import status
+from pydantic import BaseModel
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-from pydantic import BaseModel
-from typing import Optional
+from sqlalchemy.orm import Session
+
+from . import get_db
+from . import router
+from database.models import User
+from utils.helpers import address_formatter
 
 
 class EmailSend(BaseModel):
@@ -24,6 +30,25 @@ class EmailSend(BaseModel):
     class Config:
         orm_mode = True
 
+        schema_extra = {
+            "example": {
+                "from_email": "sender@email.com",
+                "to_email": "sendee@email.com",
+            }
+        }
+
+
+class NbhEmailSend(EmailSend):
+    apartment_name: Optional[str]
+    address1: Optional[str]
+    address2: Optional[str]
+    city: Optional[str]
+    state: Optional[str]
+    pincode: Optional[str]
+    verificationurl: Optional[str] = None
+    email: Optional[str]
+
+    class Config:
         schema_extra = {
             "example": {
                 "from_email": "sender@email.com",
@@ -106,6 +131,44 @@ def send_email_contact(email: EmailSend, background_task: BackgroundTasks):
     try:
         background_task.add_task(send_message, message)
         return "Thanks for contacting us!"
+    except Exception:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
+        )
+
+
+# Method for the neighbourhood registration emails
+@router.post("/email/send/nbhregistration", status_code=status.HTTP_201_CREATED)
+def send_nbh_registration_email(
+    email: NbhEmailSend, background_task: BackgroundTasks
+):
+    message = Mail(from_email=email.from_email, to_emails=email.to_email)
+
+    if email.address1:
+        address1_title = address_formatter(email.address1)
+
+    if email.address2:
+        address2_title = address_formatter(email.address2)
+
+    message.dynamic_template_data = {
+        "apartment_name": email.apartment_name.title()
+        if email.apartment_name
+        else None,
+        "address1": address1_title or None,
+        "address2": address2_title or None,
+        "city": email.city.title() if email.city else None,
+        "state": email.state.title() if email.state else None,
+        "pincode": email.pincode or None,
+        "email": email.email.lower() if email.email else None,
+        "verificationurl": email.verificationurl,
+        "year": email.year or datetime.now().year,
+    }
+
+    message.template_id = os.getenv(email.template_name)
+
+    try:
+        background_task.add_task(send_message, message)
+        return status.HTTP_202_ACCEPTED
     except Exception:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
