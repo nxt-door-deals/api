@@ -1,6 +1,7 @@
+from fastapi.testclient import TestClient
+
 from app.main import app
 from routers import apartments
-from fastapi.testclient import TestClient
 
 app.include_router(apartments.router)
 client = TestClient(app)
@@ -16,6 +17,7 @@ def test_add_apartment():
             "city": "Bengaluru",
             "state": "Karnataka",
             "pincode": "560066",
+            "submitted_by": "customer@randomemail.com",
         },
         headers={"Content-Type": "application/json"},
     )

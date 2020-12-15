@@ -47,7 +47,7 @@ class ApartmentCreate(ApartmentBase):
                 "city": "Bengaluru",
                 "state": "Karnataka",
                 "pincode": "560066",
-                "email": "customer@randomemail.com",
+                "submitted_by": "customer@randomemail.com",
             }
         }
 
