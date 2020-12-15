@@ -97,3 +97,17 @@ class AdImage(Base):
 
     def __repr__(self):
         return f"AdImages({self.ad_id}, {self.image_path})"
+
+
+class LikedAd(Base):
+    __tablename__ = "likedads"
+
+    id = Column(BigInteger, primary_key=True, nullable=False, index=True)
+    ad_id = Column(Integer, ForeignKey("ads.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+
+    ad = relationship("Ad")
+    user = relationship("User")
+
+    def __repr__(self):
+        return f"LikedAd({self.ad_id}, {self.user_id})"

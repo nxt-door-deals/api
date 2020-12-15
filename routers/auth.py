@@ -114,6 +114,7 @@ def get_current_user(
             User.email_verification_hash,
             User.email_verification_timestamp,
             User.apartment_id,
+            User.apartment_number,
             User.ads_path,
             User.profile_path,
             Apartment.name,
@@ -131,7 +132,7 @@ def get_current_user(
 
     CurrentUser = namedtuple(
         "CurrentUser",
-        "id name email is_active mobile mail_subscribed otp email_verified email_verification_hash email_verification_timestamp apartment_id ads_path profile_path apartment_name",
+        "id name email is_active mobile mail_subscribed otp email_verified email_verification_hash email_verification_timestamp apartment_id apartment_number ads_path profile_path apartment_name",
     )
 
     user_dict = CurrentUser._make(user)._asdict()
@@ -150,6 +151,7 @@ def get_current_user(
             "email_verification_timestamp"
         ],
         "apartment_id": user_dict["apartment_id"],
+        "apartment_number": user_dict["apartment_number"],
         "ads_path": user_dict["ads_path"],
         "profile_path": user_dict["profile_path"],
         "apartment_name": user_dict["apartment_name"],

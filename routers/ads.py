@@ -1,7 +1,9 @@
 import io
+import locale
 import os
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import List
 from typing import Optional
 
@@ -101,23 +103,34 @@ def get_images_from_s3(ad_id: int, db: Session):
     return db.query(AdImage.image_path).filter(AdImage.ad_id == ad_id).all()
 
 
+def format_price(amount):
+    locale.setlocale(locale.LC_ALL, "en_IN.UTF-8")
+
+    # This is to avoid the trailing .00 for non-decimal numbers
+    if Decimal(amount) % 1 != 0:
+        return locale.currency(amount, symbol=False, grouping=True)
+
+    return f"{amount:,}"
+
+
 def get_ads(records: List, db: Session):
     ad_list = []
     ad_data = {}
 
     for record in records:
+        formatted_price = format_price(record.price)
+
         ad_images = get_images_from_s3(record.id, db)
 
         ad_data["id"] = record.id
         ad_data["posted_by"] = record.posted_by
         ad_data["title"] = record.title
-        ad_data["price"] = record.price
+        ad_data["price"] = formatted_price
         ad_data["date_posted"] = get_posted_days(record.created_on)
         ad_data["images"] = [image["image_path"] for image in ad_images]
         ad_data["ad_type"] = record.ad_type
 
         ad_list.append(ad_data.copy())
-
     return ad_list
 
 
