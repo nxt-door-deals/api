@@ -1,19 +1,21 @@
 import io
-import locale
 import os
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from math import trunc
 from typing import List
 from typing import Optional
 
 import boto3
+from babel.numbers import format_decimal
 from fastapi import Depends
 from fastapi import File
 from fastapi import Form
 from fastapi import HTTPException
 from fastapi import status
 from fastapi import UploadFile
+from PIL import ExifTags
 from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy import and_
@@ -49,6 +51,29 @@ class AdsBase(BaseModel):
 
 
 # Helpers
+
+# This function is mainly for images clicked on phones where the exif data causes image rotation
+def fix_image_orientation(optimized_image):
+    for orientation in ExifTags.TAGS.keys():
+        if ExifTags.TAGS[orientation] == "Orientation":
+            break
+
+    exif = optimized_image._getexif()
+
+    if exif:
+        if 274 in exif.keys():
+            if exif[274] == 3:
+                optimized_image = optimized_image.rotate(180, expand=True)
+            elif exif[274] == 6:
+                optimized_image = optimized_image.rotate(270, expand=True)
+            elif exif[274] == 8:
+                optimized_image = optimized_image.rotate(90, expand=True)
+    else:
+        return optimized_image
+
+    return optimized_image
+
+
 def upload_files_to_s3(
     ad_id: int, user_id: int, uploadedImages: List, db: Session
 ):
@@ -67,6 +92,9 @@ def upload_files_to_s3(
             file_ext = ".jpeg"
 
         optimized_image = Image.open(image.file)
+
+        optimized_image = fix_image_orientation(optimized_image)
+
         optimized_image = optimized_image.resize(image_size)
 
         in_mem_file = io.BytesIO()
@@ -104,13 +132,12 @@ def get_images_from_s3(ad_id: int, db: Session):
 
 
 def format_price(amount):
-    locale.setlocale(locale.LC_ALL, "en_IN.UTF-8")
 
     # This is to avoid the trailing .00 for non-decimal numbers
     if Decimal(amount) % 1 != 0:
-        return locale.currency(amount, symbol=False, grouping=True)
+        return format_decimal(amount, locale="en_IN")
 
-    return f"{amount:,}"
+    return format_decimal(trunc(amount), locale="en_IN")
 
 
 def get_ads(records: List, db: Session):
@@ -129,6 +156,8 @@ def get_ads(records: List, db: Session):
         ad_data["date_posted"] = get_posted_days(record.created_on)
         ad_data["images"] = [image["image_path"] for image in ad_images]
         ad_data["ad_type"] = record.ad_type
+        ad_data["ad_category"] = record.ad_category
+        ad_data["condition"] = record.condition
 
         ad_list.append(ad_data.copy())
     return ad_list
@@ -198,6 +227,19 @@ def get_ads_for_neighbourhood(nbh_id: int, db: Session = Depends(get_db)):
     records = (
         db.query(Ad)
         .filter(Ad.apartment_id == nbh_id)
+        .order_by(Ad.created_on.desc())
+        .all()
+    )
+
+    return get_ads(records, db)
+
+
+# Get ads for a particular user
+@router.get("/userads/get/{user_id}", status_code=status.HTTP_200_OK)
+def get_ads_for_user(user_id: int, db: Session = Depends(get_db)):
+    records = (
+        db.query(Ad)
+        .filter(Ad.posted_by == user_id)
         .order_by(Ad.created_on.desc())
         .all()
     )

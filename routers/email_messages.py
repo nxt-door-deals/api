@@ -107,7 +107,7 @@ def send_email_otp(
         )
 
     # Dynamic data in the templates
-    message.dynamic_template_data = {"year": year, "otp": otp}
+    message.dynamic_template_data = {"year": year, "otp": otp[0]}
     message.template_id = os.getenv(email.template_name)
 
     try:

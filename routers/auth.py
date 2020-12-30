@@ -89,6 +89,14 @@ def get_current_user(
         detail="Sorry! We could not validate those credentials",
         headers={"WWWW-Authenticate": "Bearer"},
     )
+
+    if not token:
+        return HTTPException(
+            status_code=401,
+            detail="Could not verify your credentials",
+            headers={"WWWW-Authenticate": "Bearer"},
+        )
+
     try:
         payload = jwt.decode(
             token, os.getenv("SECRET_KEY"), os.getenv("ALGORITHM")

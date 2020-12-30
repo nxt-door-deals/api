@@ -2,20 +2,28 @@ import hashlib
 import os
 import secrets
 from datetime import datetime
+from typing import List
 from typing import Optional
 
 import boto3
 import pytz
-from database.models import User
-from fastapi import Depends, HTTPException, status
+from fastapi import BackgroundTasks
+from fastapi import Depends
+from fastapi import HTTPException
+from fastapi import status
 from passlib.hash import pbkdf2_sha256
 from pydantic import BaseModel
 from sqlalchemy import and_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from . import get_db, router
+from . import get_db
+from . import router
 from .auth import create_access_token
+from database.models import Ad
+from database.models import AdImage
+from database.models import LikedAd
+from database.models import User
 
 
 # Schemas
@@ -135,6 +143,127 @@ def create_user_folders_in_s3(id: int):
         )
 
 
+def delete_s3_user_folder(user_id: int):
+    s3_resource = boto3.resource(
+        "s3",
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    )
+
+    bucket = s3_resource.Bucket(os.getenv("AWS_STORAGE_BUCKET_NAME"))
+
+    try:
+        objects_to_delete = [
+            {"Key": object.key}
+            for object in bucket.objects.filter(Prefix=f"users/{user_id}")
+        ]
+
+        if objects_to_delete:
+            bucket.delete_objects(Delete={"Objects": objects_to_delete})
+            return "Folders deleted"
+        else:
+            return "No folders to delete"
+
+    except Exception:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            detail="There was an error deleting the user folder",
+        )
+
+
+def delete_s3_ad_folders(user_id: int, ad_id: int):
+    s3_resource = boto3.resource(
+        "s3",
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    )
+
+    bucket = s3_resource.Bucket(os.getenv("AWS_STORAGE_BUCKET_NAME"))
+
+    try:
+        objects_to_delete = [
+            {"Key": object.key}
+            for object in bucket.objects.filter(
+                Prefix=f"users/{user_id}/ads/{ad_id}"
+            )
+        ]
+
+        if objects_to_delete:
+            bucket.delete_objects(Delete={"Objects": objects_to_delete})
+            return "Ad folders deleted"
+        else:
+            return "No ad folders to delete"
+
+    except Exception:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            detail="There was an error deleting the ad folders",
+        )
+
+
+def get_user_ads(user_id: int, db: Session):
+    return db.query(Ad.id).filter(Ad.posted_by == user_id).all()
+
+
+def delete_user_ads(user_id: int, ads: List, db: Session):
+    try:
+        db.query(LikedAd).filter(LikedAd.user_id == user_id).delete(
+            synchronize_session="fetch"
+        )
+
+        for ad in ads:
+            db.query(AdImage).filter(AdImage.ad_id == ad[0]).delete(
+                synchronize_session="fetch"
+            )
+
+        db.query(Ad).filter(Ad.posted_by == user_id).delete(
+            synchronize_session="fetch"
+        )
+
+        db.commit()
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to delete user ads",
+        )
+
+
+def delete_selected_ad(ad_id: int, db: Session):
+    try:
+        db.query(LikedAd).filter(LikedAd.ad_id == ad_id).delete(
+            synchronize_session="fetch"
+        )
+
+        db.query(AdImage).filter(AdImage.ad_id == ad_id).delete(
+            synchronize_session="fetch"
+        )
+
+        db.query(Ad).filter(Ad.id == ad_id).delete(synchronize_session="fetch")
+
+        db.commit()
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to delete user ads",
+        )
+
+
+def delete_user_records(user_id: int, ads: List, db: Session):
+    try:
+        delete_user_ads(user_id, ads, db)
+
+        db.query(User).filter(User.id == user_id).delete(
+            synchronize_session="fetch"
+        )
+
+        db.commit()
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to delete user records",
+        )
+
+
 # Endpoints
 @router.get("/user/validate_email/{email}", status_code=status.HTTP_200_OK)
 def validate_email(email: str, db: Session = Depends(get_db)):
@@ -249,6 +378,38 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     }
 
 
+@router.delete("/user/delete/{user_id}", status_code=status.HTTP_202_ACCEPTED)
+def delete_user(
+    user_id: int,
+    background_task: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    try:
+        background_task.add_task(delete_s3_user_folder, user_id)
+
+        ads = get_user_ads(user_id, db)
+
+        background_task.add_task(delete_user_records, user_id, ads, db)
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to delete user",
+        )
+
+
+@router.delete("/userads/delete/", status_code=status.HTTP_202_ACCEPTED)
+def delete_user_ad(user_id: int, ad_id: int, db: Session = Depends(get_db)):
+    try:
+        delete_s3_ad_folders(user_id, ad_id)
+
+        delete_selected_ad(ad_id, db)
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to delete user ads",
+        )
+
+
 @router.put("/user/update/{user_id}", status_code=status.HTTP_200_OK)
 def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db)):
 
@@ -261,16 +422,16 @@ def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db)):
                 User.email: user_to_update["email"].lower(),
                 User.mobile: user_to_update["mobile"],
                 User.apartment_id: user_to_update["apartment_id"],
+                User.apartment_number: user_to_update["apartment_number"],
             }
         )
 
         db.commit()
+        return user_to_update
     except SQLAlchemyError:
         raise HTTPException(
             status_code=500, detail="Unable to update user details"
         )
-
-    return user_to_update
 
 
 @router.put("/user/status/{user_id}", status_code=status.HTTP_200_OK)
