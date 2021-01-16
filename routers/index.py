@@ -1,5 +1,6 @@
-from . import router
 from fastapi.responses import HTMLResponse
+
+from . import router
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -13,7 +14,7 @@ def return_index_html():
             <meta name="robots" content="noindex,nofollow" />
             <meta
                 property="og:image"
-                content="https://nxt-door-deals.s3.ap-south-1.amazonaws.com/site-images/icon.png"
+                content="https://nxt-door-deals-test.s3.ap-south-1.amazonaws.com/site-images/icon.png"
             />
             <meta property="og:image:width" content="256" />
             <meta property="og:image:height" content="256" />
@@ -56,7 +57,7 @@ def return_index_html():
             </style>
         </head>
         <body>
-            <img src="https://nxt-door-deals.s3.ap-south-1.amazonaws.com/site-images/icon.png" height="200px" alt="Brand Icon"/>
+            <img src="https://nxt-door-deals-test.s3.ap-south-1.amazonaws.com/site-images/icon.png" height="200px" alt="Brand Icon"/>
             <p>Welcome to <strong>nxt-door deals</strong>!</p>
             <p>Proceed to the website - <a href="https://nxtdoordeals.com">nxtdoordeals.com</a></p>
         </body>

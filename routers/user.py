@@ -9,6 +9,7 @@ import boto3
 import pytz
 from fastapi import BackgroundTasks
 from fastapi import Depends
+from fastapi import Header
 from fastapi import HTTPException
 from fastapi import status
 from passlib.hash import pbkdf2_sha256
@@ -297,12 +298,16 @@ def fetch_user(user_id: int, db: Session = Depends(get_db)):
         )
 
 
-@router.post(
-    "/register/user",
-    response_model=UserCreate,
-    status_code=status.HTTP_201_CREATED,
-)
-def register_user(user: UserCreate, db: Session = Depends(get_db)):
+@router.post("/register/user", status_code=status.HTTP_201_CREATED)
+def register_user(
+    user: UserCreate, db: Session = Depends(get_db), api_key: str = Header(None)
+):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
     # hash the password
     hashed_password = pbkdf2_sha256.hash(user.password)
 
@@ -383,7 +388,14 @@ def delete_user(
     user_id: int,
     background_task: BackgroundTasks,
     db: Session = Depends(get_db),
+    api_key: str = Header(None),
 ):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
     try:
         background_task.add_task(delete_s3_user_folder, user_id)
 
@@ -398,7 +410,19 @@ def delete_user(
 
 
 @router.delete("/userads/delete/", status_code=status.HTTP_202_ACCEPTED)
-def delete_user_ad(user_id: int, ad_id: int, db: Session = Depends(get_db)):
+def delete_user_ad(
+    user_id: int,
+    ad_id: int,
+    db: Session = Depends(get_db),
+    api_key: str = Header(None),
+):
+
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
     try:
         delete_s3_ad_folders(user_id, ad_id)
 
@@ -411,7 +435,18 @@ def delete_user_ad(user_id: int, ad_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/user/update/{user_id}", status_code=status.HTTP_200_OK)
-def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db)):
+def update_user(
+    user_id: int,
+    user: UserUpdate,
+    db: Session = Depends(get_db),
+    api_key: str = Header(None),
+):
+
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
 
     user_to_update = user.dict()
 
@@ -436,8 +471,17 @@ def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db)):
 
 @router.put("/user/status/{user_id}", status_code=status.HTTP_200_OK)
 def update_user_status(
-    user_id: int, user: UserStatus, db: Session = Depends(get_db)
+    user_id: int,
+    user: UserStatus,
+    db: Session = Depends(get_db),
+    api_key: str = Header(None),
 ):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
     try:
         db.query(User).filter(User.id == user_id).update(
             {User.is_active: user.dict()["active_status"]}
@@ -452,8 +496,17 @@ def update_user_status(
 
 @router.put("/user/subscription/{user_id}", status_code=status.HTTP_200_OK)
 def update_user_subscription_status(
-    user_id: int, user: UserSubscriptionStatus, db: Session = Depends(get_db)
+    user_id: int,
+    user: UserSubscriptionStatus,
+    db: Session = Depends(get_db),
+    api_key: str = Header(None),
 ):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
     try:
         db.query(User).filter(User.id == id).update(
             {User.mail_subscribed: user.dict()["subscription_status"]}
@@ -468,8 +521,17 @@ def update_user_subscription_status(
 
 @router.put("/user/password/{user_id}", status_code=status.HTTP_200_OK)
 def update_user_password(
-    user_id: int, user: UserPasswordUpdate, db: Session = Depends(get_db)
+    user_id: int,
+    user: UserPasswordUpdate,
+    db: Session = Depends(get_db),
+    api_key: str = Header(None),
 ):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
     new_password_hash = pbkdf2_sha256.hash(user.dict()["password"])
 
     try:
@@ -549,8 +611,16 @@ def verify_user_email(
 
 @router.put("/email_timestamp/refresh", status_code=status.HTTP_200_OK)
 def email_timestamp_refresh(
-    user: UserEmailVerification, db: Session = Depends(get_db)
+    user: UserEmailVerification,
+    db: Session = Depends(get_db),
+    api_key: str = Header(None),
 ):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
     try:
         db.query(User).filter(User.id == user.id).update(
             {User.email_verification_timestamp: datetime.utcnow()}
@@ -567,7 +637,18 @@ def email_timestamp_refresh(
 
 
 @router.put("/user/otp_generation", status_code=status.HTTP_201_CREATED)
-def generate_otp(user: UserOtpBase, db: Session = Depends(get_db)):
+def generate_otp(
+    user: UserOtpBase,
+    db: Session = Depends(get_db),
+    api_key: str = Header(None),
+):
+
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
     email = user.email.lower()
     otp = secrets.token_hex(3).upper()
 
@@ -587,8 +668,18 @@ def generate_otp(user: UserOtpBase, db: Session = Depends(get_db)):
 
 @router.get("/user/verify_otp/{user_id}", status_code=status.HTTP_200_OK)
 def verify_otp(
-    user_id: int, otp: str, timestamp: datetime, db: Session = Depends(get_db)
+    user_id: int,
+    otp: str,
+    timestamp: datetime,
+    db: Session = Depends(get_db),
+    api_key: str = Header(None),
 ):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
     try:
         record = (
             db.query(User.otp, User.otp_verification_timestamp)
@@ -622,8 +713,16 @@ def verify_otp(
 
 @router.put("/otp_timestamp/refresh", status_code=status.HTTP_200_OK)
 def otp_timestamp_refresh(
-    user: UserOtpVerification, db: Session = Depends(get_db)
+    user: UserOtpVerification,
+    db: Session = Depends(get_db),
+    api_key: str = Header(None),
 ):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
     try:
         db.query(User).filter(User.id == user.id).update(
             {User.otp_verification_timestamp: datetime.utcnow()}

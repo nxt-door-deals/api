@@ -1,9 +1,11 @@
 import hashlib
+import os
 import secrets
 from typing import List
 from typing import Optional
 
 from fastapi import Depends
+from fastapi import Header
 from fastapi import HTTPException
 from fastapi import status
 from pydantic import BaseModel
@@ -101,7 +103,18 @@ def search_apartment(name: str, db: Session = Depends(get_db)):
 
 
 @router.post("/apartments/add", status_code=status.HTTP_201_CREATED)
-def add_apartment(apartment: ApartmentCreate, db: Session = Depends(get_db)):
+def add_apartment(
+    apartment: ApartmentCreate,
+    db: Session = Depends(get_db),
+    api_key: str = Header(None),
+):
+
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
     apartment_verification_hash = hashlib.sha256(
         secrets.token_hex(16).encode()
     ).hexdigest()
@@ -146,7 +159,15 @@ def add_apartment(apartment: ApartmentCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/verify/neighbourhood/", status_code=status.HTTP_200_OK)
-def verify_neighbourhood(token: str, db: Session = Depends(get_db)):
+def verify_neighbourhood(
+    token: str, db: Session = Depends(get_db), api_key: str = Header(None)
+):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
     split_token = token.split("|")
 
     verification_hash = split_token[0]

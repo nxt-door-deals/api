@@ -12,6 +12,7 @@ from babel.numbers import format_decimal
 from fastapi import Depends
 from fastapi import File
 from fastapi import Form
+from fastapi import Header
 from fastapi import HTTPException
 from fastapi import status
 from fastapi import UploadFile
@@ -27,6 +28,7 @@ from . import get_db
 from . import router
 from database.models import Ad
 from database.models import AdImage
+from database.models import User
 from utils.helpers import get_posted_days
 
 
@@ -164,6 +166,61 @@ def get_ads(records: List, db: Session):
 
 
 # End points
+
+# Fetch ad from ad id
+@router.get("/ads/{id}", status_code=status.HTTP_200_OK)
+def get_ad_details_from_id(id: int, db: Session = Depends(get_db)):
+
+    ad = {}
+
+    try:
+        ad_record = db.query(Ad).filter(Ad.id == id).first()
+        user_record = (
+            db.query(User).filter(User.id == ad_record.posted_by).first()
+        )
+
+        price = format_price(ad_record.price)
+        ad_images = get_images_from_s3(ad_record.id, db)
+
+        available_from = (
+            "immediately"
+            if ad_record.available_from < datetime.today()
+            else ad_record.available_from
+        )
+
+        modified_id = ad_record.ad_category[0] + "AD" + str(ad_record.id)
+
+        ad["id"] = ad_record.id
+        ad["modified_id"] = modified_id
+        ad["title"] = ad_record.title
+        ad["description"] = ad_record.description
+        ad["category"] = ad_record.ad_category
+        ad["ad_type"] = ad_record.ad_type
+        ad["price"] = price
+        ad["negotiable"] = ad_record.negotiable
+        ad["condition"] = ad_record.condition
+        ad["available_from"] = available_from
+        ad["sold"] = ad_record.sold
+        ad["images"] = [image["image_path"] for image in ad_images]
+        ad["apartment_id"] = ad_record.apartment_id
+        ad["flat_no"] = (
+            user_record.apartment_number
+            if ad_record.publish_flat_number
+            else None
+        )
+        ad["posted_by_name"] = user_record.name
+        ad["posted_by_id"] = user_record.id
+        ad["posted_by_email"] = user_record.email
+
+        return ad
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not fetch ad details",
+        )
+
+
+# Create an ad
 @router.post("/ads/create", status_code=status.HTTP_201_CREATED)
 def create_ad(
     title: str = Form(...),
@@ -219,6 +276,27 @@ def create_ad(
         "posted_by": posted_by,
         "apartment_id": apartment_id,
     }
+
+
+# Mark item as sold
+@router.put("/ad/sold/{ad_id}", status_code=status.HTTP_201_CREATED)
+def mark_ad_as_sold(
+    ad_id: int, db: Session = Depends(get_db), api_key: str = Header(None)
+):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
+    try:
+        db.query(Ad).filter(Ad.id == ad_id).update({Ad.sold: True})
+        db.commit()
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could nt mark item as sold",
+        )
 
 
 # Get ads for a particular neighbourhood
