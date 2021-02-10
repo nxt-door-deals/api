@@ -30,6 +30,7 @@ python-multipart = "*"
 alembic = "*"
 pillow = "*"
 babel = "*"
+better-profanity = "*"
 
 [requires]
 python_version = "3.7"

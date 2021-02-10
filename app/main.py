@@ -18,6 +18,7 @@ from routers import (
     heartbeat,
     index,
     user,
+    chat,
 )
 
 # Create all the database models
@@ -46,3 +47,4 @@ app.include_router(auth.router, prefix=prefix)
 app.include_router(heartbeat.router, prefix=prefix)
 app.include_router(email_messages.router, prefix=prefix)
 app.include_router(ads.router, prefix=prefix)
+app.include_router(chat.router, prefix=prefix)

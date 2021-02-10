@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import List
 from typing import Optional
 
-import boto3
 import pytz
 from fastapi import BackgroundTasks
 from fastapi import Depends
@@ -23,8 +22,11 @@ from . import router
 from .auth import create_access_token
 from database.models import Ad
 from database.models import AdImage
+from database.models import Chat
+from database.models import ChatHistory
 from database.models import LikedAd
 from database.models import User
+from utils.helpers import initialize_s3
 
 
 # Schemas
@@ -79,10 +81,16 @@ class UserStatus(BaseModel):
 
 
 class UserSubscriptionStatus(BaseModel):
+    email: str
     subscription_status: bool
 
     class Config:
-        schema_extra = {"example": {"subscription_status": False}}
+        schema_extra = {
+            "example": {
+                "email": "email@example.com",
+                "subscription_status": False,
+            }
+        }
 
 
 class UserPasswordUpdate(BaseModel):
@@ -105,7 +113,6 @@ class UserOtpVerification(UserEmailVerification):
 
 
 class UserOtpBase(BaseModel):
-    id: int
     email: str
 
     class Config:
@@ -120,11 +127,8 @@ def check_existing_user(db: Session, email: str) -> bool:
 
 
 def create_user_folders_in_s3(id: int):
-    s3_resource = boto3.resource(
-        "s3",
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-    )
+    s3_resource = initialize_s3()
+
     folder_list = [f"users/{id}/profile/", f"users/{id}/ads/"]
 
     try:
@@ -145,11 +149,7 @@ def create_user_folders_in_s3(id: int):
 
 
 def delete_s3_user_folder(user_id: int):
-    s3_resource = boto3.resource(
-        "s3",
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-    )
+    s3_resource = initialize_s3()
 
     bucket = s3_resource.Bucket(os.getenv("AWS_STORAGE_BUCKET_NAME"))
 
@@ -173,11 +173,7 @@ def delete_s3_user_folder(user_id: int):
 
 
 def delete_s3_ad_folders(user_id: int, ad_id: int):
-    s3_resource = boto3.resource(
-        "s3",
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-    )
+    s3_resource = initialize_s3()
 
     bucket = s3_resource.Bucket(os.getenv("AWS_STORAGE_BUCKET_NAME"))
 
@@ -239,7 +235,7 @@ def delete_selected_ad(ad_id: int, db: Session):
             synchronize_session="fetch"
         )
 
-        db.query(Ad).filter(Ad.id == ad_id).delete(synchronize_session="fetch")
+        db.query(Ad).filter(Ad.id == ad_id).update({Ad.active: False})
 
         db.commit()
     except SQLAlchemyError:
@@ -276,22 +272,34 @@ def validate_email(email: str, db: Session = Depends(get_db)):
             detail="Sorry, we could not find that email address",
         )
 
-    return {"id": record.id, "email": record.email}
+    return {"email": record.email}
 
 
 @router.get("/user/{user_id}", status_code=status.HTTP_200_OK)
-def fetch_user(user_id: int, db: Session = Depends(get_db)):
+def fetch_user(
+    user_id: int, db: Session = Depends(get_db), api_key: str = Header(None)
+):
+
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
 
     try:
         fetched_user = db.query(User).filter(User.id == user_id).first()
 
-        return {
-            "name": fetched_user.name,
-            "email": fetched_user.email,
-            "mobile": fetched_user.mobile,
-            "apartment_id": fetched_user.apartment_id,
-            "active_status": fetched_user.is_active,
-        }
+        if fetched_user:
+            return {
+                "name": fetched_user.name,
+                "email": fetched_user.email,
+                "mobile": fetched_user.mobile,
+                "apartment_id": fetched_user.apartment_id,
+                "active_status": fetched_user.is_active,
+            }
+        else:
+            return None
+
     except SQLAlchemyError:
         raise HTTPException(
             status_code=500, detail="Unable to fetch user details"
@@ -494,9 +502,8 @@ def update_user_status(
         )
 
 
-@router.put("/user/subscription/{user_id}", status_code=status.HTTP_200_OK)
+@router.put("/user/subscription", status_code=status.HTTP_200_OK)
 def update_user_subscription_status(
-    user_id: int,
     user: UserSubscriptionStatus,
     db: Session = Depends(get_db),
     api_key: str = Header(None),
@@ -508,11 +515,14 @@ def update_user_subscription_status(
         )
 
     try:
-        db.query(User).filter(User.id == id).update(
-            {User.mail_subscribed: user.dict()["subscription_status"]}
+        db.query(User).filter(User.email == user.email).update(
+            {
+                User.mail_subscribed: user.dict()["subscription_status"],
+                User.email: user.email,
+            }
         )
         db.commit()
-        return "User subscription deactivated"
+        return "User subscription status updated"
     except SQLAlchemyError:
         raise HTTPException(
             status_code=500, detail="Error updating user subscription status"
@@ -653,13 +663,19 @@ def generate_otp(
     otp = secrets.token_hex(3).upper()
 
     try:
-        db.query(User).filter(User.id == user.id, User.email == email).update(
+        db.query(User).filter(User.email == email).update(
             {User.otp: otp, User.otp_verification_timestamp: datetime.utcnow()}
         )
 
         db.commit()
 
-        return "otp generated"
+        record = db.query(User).filter(User.email == email).first()
+
+        return {
+            "id": record.id,
+            "email": record.email,
+            "otp_verification_timestamp": record.otp_verification_timestamp,
+        }
     except SQLAlchemyError:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="Error generating the otp"
@@ -735,4 +751,84 @@ def otp_timestamp_refresh(
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail="The otp timestamp could not be updated",
+        )
+
+
+@router.get("/chats/seller/{user_id}", status_code=status.HTTP_200_OK)
+def get_chats_as_seller(
+    user_id: int, db: Session = Depends(get_db), api_key: str = Header(None)
+):
+
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
+    try:
+        return (
+            db.query(
+                User.name.label("buyer_name"),
+                Ad.title.label("ad_title"),
+                Chat.ad_id.label("ad_id"),
+                Chat.buyer_id.label("buyer_id"),
+                Chat.seller_id.label("seller_id"),
+                ChatHistory.new_notifications.label("new_chats"),
+            )
+            .filter(
+                and_(
+                    User.id == Chat.buyer_id,
+                    Ad.id == Chat.ad_id,
+                    Chat.chat_id == ChatHistory.chat_id,
+                    Chat.seller_id == user_id,
+                    Ad.active == True,  # noqa
+                )
+            )
+            .all()
+        )
+
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No seller chat record found",
+        )
+
+
+@router.get("/chats/buyer/{user_id}", status_code=status.HTTP_200_OK)
+def get_chats_as_buyer(
+    user_id: int, db: Session = Depends(get_db), api_key: str = Header(None)
+):
+
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
+    try:
+        return (
+            db.query(
+                User.name.label("seller_name"),
+                Ad.title.label("ad_title"),
+                Chat.ad_id.label("ad_id"),
+                Chat.buyer_id.label("buyer_id"),
+                Chat.seller_id.label("seller_id"),
+                ChatHistory.new_notifications.label("new_chats"),
+            )
+            .filter(
+                and_(
+                    User.id == Chat.seller_id,
+                    Ad.id == Chat.ad_id,
+                    Chat.chat_id == ChatHistory.chat_id,
+                    Chat.buyer_id == user_id,
+                    Ad.active == True,  # noqa
+                )
+            )
+            .all()
+        )
+
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No buyer chat record found",
         )

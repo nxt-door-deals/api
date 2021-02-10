@@ -1,5 +1,8 @@
+import os
 import re
 from datetime import datetime
+
+import boto3
 
 
 def address_formatter(address):
@@ -37,3 +40,11 @@ def get_posted_days(posted_timestamp):
         return f"{posted_delta} days ago"
     elif posted_delta > 30:
         return "Over a month ago"
+
+
+def initialize_s3():
+    return boto3.resource(
+        "s3",
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    )

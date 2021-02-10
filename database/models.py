@@ -8,6 +8,8 @@ from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
 from sqlalchemy import Numeric
 from sqlalchemy import String
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import relationship
 
 from database.db import Base
@@ -74,6 +76,7 @@ class Ad(Base):
     condition = Column(String(50))
     available_from = Column(DateTime)
     publish_flat_number = Column(Boolean, default=False)
+    active = Column(Boolean, default=True)
     sold = Column(Boolean, default=False)
     posted_by = Column(Integer, ForeignKey("users.id"))
     apartment_id = Column(Integer, ForeignKey("apartments.id"))
@@ -111,3 +114,49 @@ class LikedAd(Base):
 
     def __repr__(self):
         return f"LikedAd({self.ad_id}, {self.user_id})"
+
+
+class Chat(Base):
+    __tablename__ = "chats"
+
+    id = Column(BigInteger, primary_key=True, nullable=False, index=True)
+    ad_id = Column(Integer, ForeignKey("ads.id"))
+    seller_id = Column(Integer)
+    buyer_id = Column(Integer)
+    chat_id = Column(String(64), unique=True, nullable=False)
+
+    ad = relationship("Ad")
+
+    def __repr__(self):
+        return f"Chat({self.ad_id}, {self.seller_id}, {self.buyer_id})"
+
+
+class ChatHistory(Base):
+    __tablename__ = "chathistory"
+
+    id = Column(BigInteger, primary_key=True, nullable=False, index=True)
+    chat_id = Column(String(64), ForeignKey("chats.chat_id"), nullable=False)
+    history = Column(MutableList.as_mutable(JSONB))
+    new_notifications = Column(Boolean, default=False)
+
+    chat = relationship("Chat")
+
+    def __repr__(self):
+        return f"ChatHistory({self.chat_id}, {self.history})"
+
+
+class ReportedAd(Base):
+    __tablename__ = "reportedads"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ad_id = Column(Integer, ForeignKey("ads.id"), index=True)
+    reported_by = Column(Integer, ForeignKey("users.id"), index=True)
+    reason = Column(String(100), nullable=False)
+    description = Column(String(5000), nullable=False)
+    reported_on = Column(DateTime, default=datetime.now)
+
+    ad = relationship("Ad")
+    user = relationship("User")
+
+    def __repr__(self):
+        return f"ReportedAd({self.ad_id}, {self.reported_by}, {self.reason})"
