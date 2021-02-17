@@ -28,6 +28,7 @@ from . import get_db
 from . import router
 from database.models import Ad
 from database.models import AdImage
+from database.models import Apartment
 from database.models import Chat
 from database.models import ReportedAd
 from database.models import User
@@ -240,6 +241,12 @@ def get_ad_details_from_id(id: int, db: Session = Depends(get_db)):
             db.query(Ad).filter(Ad.id == id, Ad.active == True).first()  # noqa
         )
 
+        neighbourhood = (
+            db.query(Apartment.name)
+            .filter(Apartment.id == ad_record.apartment_id)
+            .first()
+        )
+
         # Check if ad was reported more than 5 times
         ad_reported_record = reported_ad_check(id, db)
 
@@ -279,6 +286,7 @@ def get_ad_details_from_id(id: int, db: Session = Depends(get_db)):
         ad["sold"] = ad_record.sold
         ad["images"] = [image["image_path"] for image in ad_images]
         ad["apartment_id"] = ad_record.apartment_id
+        ad["apartment_name"] = neighbourhood.name
         ad["flat_no"] = (
             user_record.apartment_number
             if ad_record.publish_flat_number
@@ -459,6 +467,7 @@ def search_ads(
             and_(
                 Ad.ad_category.ilike(category),
                 Ad.apartment_id == nbh_id,
+                Ad.active == True,  # noqa
                 or_(
                     Ad.title.ilike(search_text),
                     Ad.description.ilike(search_text),
@@ -477,7 +486,13 @@ def search_ads(
 def search_giveaways(nbh_id: int, db: Session = Depends(get_db)):
     giveaway_list = (
         db.query(Ad)
-        .filter(and_(Ad.apartment_id == nbh_id, Ad.ad_type == "giveaway"))
+        .filter(
+            and_(
+                Ad.apartment_id == nbh_id,
+                Ad.ad_type == "giveaway",
+                Ad.active == True,  # noqa
+            )
+        )
         .order_by(Ad.created_on.desc())
         .all()
     )
@@ -490,7 +505,13 @@ def search_giveaways(nbh_id: int, db: Session = Depends(get_db)):
 def sort_by_price_asc(nbh_id: int, db: Session = Depends(get_db)):
     price_asc_list = (
         db.query(Ad)
-        .filter(and_(Ad.apartment_id == nbh_id, Ad.ad_type == "sale"))
+        .filter(
+            and_(
+                Ad.apartment_id == nbh_id,
+                Ad.ad_type == "sale",
+                Ad.active == True,  # noqa
+            )
+        )
         .order_by(Ad.price)
         .all()
     )
@@ -503,7 +524,13 @@ def sort_by_price_asc(nbh_id: int, db: Session = Depends(get_db)):
 def sort_by_price_desc(nbh_id: int, db: Session = Depends(get_db)):
     price_desc_list = (
         db.query(Ad)
-        .filter(and_(Ad.apartment_id == nbh_id, Ad.ad_type == "sale"))
+        .filter(
+            and_(
+                Ad.apartment_id == nbh_id,
+                Ad.ad_type == "sale",
+                Ad.active == True,  # noqa
+            )
+        )
         .order_by(Ad.price.desc())
         .all()
     )
@@ -516,7 +543,7 @@ def sort_by_price_desc(nbh_id: int, db: Session = Depends(get_db)):
 def sort_by_created_asc(nbh_id: int, db: Session = Depends(get_db)):
     created_asc_list = (
         db.query(Ad)
-        .filter(Ad.apartment_id == nbh_id)
+        .filter(Ad.apartment_id == nbh_id, Ad.active == True)  # noqa
         .order_by(Ad.created_on)
         .all()
     )
@@ -529,7 +556,7 @@ def sort_by_created_asc(nbh_id: int, db: Session = Depends(get_db)):
 def sort_by_created_desc(nbh_id: int, db: Session = Depends(get_db)):
     created_desc_list = (
         db.query(Ad)
-        .filter(Ad.apartment_id == nbh_id)
+        .filter(Ad.apartment_id == nbh_id, Ad.active == True)  # noqa
         .order_by(Ad.created_on.desc())
         .all()
     )
@@ -542,7 +569,13 @@ def sort_by_created_desc(nbh_id: int, db: Session = Depends(get_db)):
 def sort_by_giveaway_asc(nbh_id: int, db: Session = Depends(get_db)):
     giveaway_asc_list = (
         db.query(Ad)
-        .filter(and_(Ad.apartment_id == nbh_id, Ad.ad_type == "giveaway"))
+        .filter(
+            and_(
+                Ad.apartment_id == nbh_id,
+                Ad.ad_type == "giveaway",
+                Ad.active == True,  # noqa
+            )
+        )
         .order_by(Ad.created_on)
         .all()
     )
@@ -555,7 +588,13 @@ def sort_by_giveaway_asc(nbh_id: int, db: Session = Depends(get_db)):
 def sort_by_giveaway_desc(nbh_id: int, db: Session = Depends(get_db)):
     giveaway_desc_list = (
         db.query(Ad)
-        .filter(and_(Ad.apartment_id == nbh_id, Ad.ad_type == "giveaway"))
+        .filter(
+            and_(
+                Ad.apartment_id == nbh_id,
+                Ad.ad_type == "giveaway",
+                Ad.active == True,  # noqa
+            )
+        )
         .order_by(Ad.created_on.desc())
         .all()
     )

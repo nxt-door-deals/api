@@ -108,6 +108,11 @@ def save_chat_message(data: str, chat_id: str, db: Session):
         {ChatHistory.history: message_list, ChatHistory.new_notifications: True}
     )
 
+    # Update the "marked delete" columns so that the chat is visible in the user account
+    db.query(Chat).filter(Chat.chat_id == chat_id).update(
+        {Chat.marked_del_buyer: False, Chat.marked_del_seller: False}
+    )
+
     db.commit()
 
 

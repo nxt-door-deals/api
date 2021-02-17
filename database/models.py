@@ -124,6 +124,10 @@ class Chat(Base):
     seller_id = Column(Integer)
     buyer_id = Column(Integer)
     chat_id = Column(String(64), unique=True, nullable=False)
+    marked_del_seller = Column(Boolean, default=False)
+    marked_del_buyer = Column(Boolean, default=False)
+    blocked_by_seller = Column(Boolean, default=False)
+    blocked_by_buyer = Column(Boolean, default=False)
 
     ad = relationship("Ad")
 

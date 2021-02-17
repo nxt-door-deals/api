@@ -770,10 +770,13 @@ def get_chats_as_seller(
             db.query(
                 User.name.label("buyer_name"),
                 Ad.title.label("ad_title"),
+                Chat.chat_id.label("chat_id"),
                 Chat.ad_id.label("ad_id"),
                 Chat.buyer_id.label("buyer_id"),
                 Chat.seller_id.label("seller_id"),
                 ChatHistory.new_notifications.label("new_chats"),
+                ChatHistory.history[-1]["sender"].label("last_sender"),
+                Chat.marked_del_seller.label("marked_for_deletion"),
             )
             .filter(
                 and_(
@@ -782,6 +785,7 @@ def get_chats_as_seller(
                     Chat.chat_id == ChatHistory.chat_id,
                     Chat.seller_id == user_id,
                     Ad.active == True,  # noqa
+                    Chat.marked_del_seller == False,  # noqa
                 )
             )
             .all()
@@ -810,10 +814,13 @@ def get_chats_as_buyer(
             db.query(
                 User.name.label("seller_name"),
                 Ad.title.label("ad_title"),
+                Chat.chat_id.label("chat_id"),
                 Chat.ad_id.label("ad_id"),
                 Chat.buyer_id.label("buyer_id"),
                 Chat.seller_id.label("seller_id"),
                 ChatHistory.new_notifications.label("new_chats"),
+                ChatHistory.history[-1]["sender"].label("last_sender"),
+                Chat.marked_del_buyer.label("marked_for_deletion"),
             )
             .filter(
                 and_(
@@ -822,6 +829,7 @@ def get_chats_as_buyer(
                     Chat.chat_id == ChatHistory.chat_id,
                     Chat.buyer_id == user_id,
                     Ad.active == True,  # noqa
+                    Chat.marked_del_buyer == False,  # noqa
                 )
             )
             .all()
@@ -831,4 +839,58 @@ def get_chats_as_buyer(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No buyer chat record found",
+        )
+
+
+@router.put("/seller/chat/delete/", status_code=status.HTTP_201_CREATED)
+def mark_seller_chat_for_deletion(
+    seller_id: int,
+    chat_id: str,
+    db: Session = Depends(get_db),
+    api_key: str = Header(None),
+):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+    try:
+        db.query(Chat).filter(
+            Chat.seller_id == seller_id, Chat.chat_id == chat_id
+        ).update({Chat.marked_del_seller: True})
+
+        db.commit()
+
+        return "Chat marked for deletion"
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not mark record for deletion",
+        )
+
+
+@router.put("/buyer/chat/delete/", status_code=status.HTTP_201_CREATED)
+def mark_buyer_chat_for_deletion(
+    buyer_id: int,
+    chat_id: str,
+    db: Session = Depends(get_db),
+    api_key: str = Header(None),
+):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+    try:
+        db.query(Chat).filter(
+            Chat.buyer_id == buyer_id, Chat.chat_id == chat_id
+        ).update({Chat.marked_del_buyer: True})
+
+        db.commit()
+
+        return "Chat marked for deletion"
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not mark record for deletion",
         )
