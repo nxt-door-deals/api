@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 
 import boto3
+from jose import jwt
 
 
 def address_formatter(address):
@@ -48,3 +49,13 @@ def initialize_s3():
         aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
         aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
     )
+
+
+def generate_id_from_token(token: str, user_id: int):
+    decoded_token = token.split(" ")
+
+    decoded_token = jwt.decode(
+        decoded_token[1], os.getenv("SECRET_KEY"), os.getenv("ALGORITHM")
+    )
+
+    return int(decoded_token["sub"]) == user_id

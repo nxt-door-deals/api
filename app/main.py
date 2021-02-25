@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from database import models
 from database.db import engine
@@ -22,21 +21,28 @@ from routers import (
     websocket_server,
 )
 
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
+
+
 # Create all the database models
 models.Base.metadata.create_all(bind=engine)
-
-app = FastAPI(docs_url=None, redoc_url=None)
 
 # Middleware definitions go here
 origins = [os.getenv("CORS_ORIGIN_SERVER")]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+middleware = [
+    Middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+]
+
+app = FastAPI(middleware=middleware, docs_url=None, redoc_url=None)
+
 
 # Routers go here
 prefix = "/api/v1"

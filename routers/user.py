@@ -26,6 +26,7 @@ from database.models import Chat
 from database.models import ChatHistory
 from database.models import LikedAd
 from database.models import User
+from utils.helpers import generate_id_from_token
 from utils.helpers import initialize_s3
 
 
@@ -276,16 +277,7 @@ def validate_email(email: str, db: Session = Depends(get_db)):
 
 
 @router.get("/user/{user_id}", status_code=status.HTTP_200_OK)
-def fetch_user(
-    user_id: int, db: Session = Depends(get_db), api_key: str = Header(None)
-):
-
-    if api_key != os.getenv("PROJECT_API_KEY"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uh uh uh! You didn't say the magic word...",
-        )
-
+def fetch_user(user_id: int, db: Session = Depends(get_db)):
     try:
         fetched_user = db.query(User).filter(User.id == user_id).first()
 
@@ -396,25 +388,29 @@ def delete_user(
     user_id: int,
     background_task: BackgroundTasks,
     db: Session = Depends(get_db),
-    api_key: str = Header(None),
+    authorization: str = Header(None),
 ):
-    if api_key != os.getenv("PROJECT_API_KEY"):
+    if "Bearer" not in authorization:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uh uh uh! You didn't say the magic word...",
         )
 
-    try:
-        background_task.add_task(delete_s3_user_folder, user_id)
+    if generate_id_from_token(authorization, user_id):
 
-        ads = get_user_ads(user_id, db)
+        try:
+            background_task.add_task(delete_s3_user_folder, user_id)
 
-        background_task.add_task(delete_user_records, user_id, ads, db)
-    except SQLAlchemyError:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to delete user",
-        )
+            ads = get_user_ads(user_id, db)
+
+            background_task.add_task(delete_user_records, user_id, ads, db)
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unable to delete user",
+            )
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
 
 @router.delete("/userads/delete/", status_code=status.HTTP_202_ACCEPTED)
@@ -422,24 +418,27 @@ def delete_user_ad(
     user_id: int,
     ad_id: int,
     db: Session = Depends(get_db),
-    api_key: str = Header(None),
+    authorization: str = Header(None),
 ):
-
-    if api_key != os.getenv("PROJECT_API_KEY"):
+    if "Bearer" not in authorization:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uh uh uh! You didn't say the magic word...",
         )
 
-    try:
-        delete_s3_ad_folders(user_id, ad_id)
+    if generate_id_from_token(authorization, user_id):
 
-        delete_selected_ad(ad_id, db)
-    except SQLAlchemyError:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to delete user ads",
-        )
+        try:
+            delete_s3_ad_folders(user_id, ad_id)
+
+            delete_selected_ad(ad_id, db)
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unable to delete user ads",
+            )
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
 
 @router.put("/user/update/{user_id}", status_code=status.HTTP_200_OK)
@@ -447,34 +446,37 @@ def update_user(
     user_id: int,
     user: UserUpdate,
     db: Session = Depends(get_db),
-    api_key: str = Header(None),
+    authorization: str = Header(None),
 ):
-
-    if api_key != os.getenv("PROJECT_API_KEY"):
+    if "Bearer" not in authorization:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uh uh uh! You didn't say the magic word...",
         )
 
-    user_to_update = user.dict()
+    if generate_id_from_token(authorization, user_id):
 
-    try:
-        db.query(User).filter(User.id == user_id).update(
-            {
-                User.name: user_to_update["name"].title(),
-                User.email: user_to_update["email"].lower(),
-                User.mobile: user_to_update["mobile"],
-                User.apartment_id: user_to_update["apartment_id"],
-                User.apartment_number: user_to_update["apartment_number"],
-            }
-        )
+        user_to_update = user.dict()
 
-        db.commit()
-        return user_to_update
-    except SQLAlchemyError:
-        raise HTTPException(
-            status_code=500, detail="Unable to update user details"
-        )
+        try:
+            db.query(User).filter(User.id == user_id).update(
+                {
+                    User.name: user_to_update["name"].title(),
+                    User.email: user_to_update["email"].lower(),
+                    User.mobile: user_to_update["mobile"],
+                    User.apartment_id: user_to_update["apartment_id"],
+                    User.apartment_number: user_to_update["apartment_number"],
+                }
+            )
+
+            db.commit()
+            return user_to_update
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=500, detail="Unable to update user details"
+            )
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
 
 @router.put("/user/status/{user_id}", status_code=status.HTTP_200_OK)
@@ -482,24 +484,28 @@ def update_user_status(
     user_id: int,
     user: UserStatus,
     db: Session = Depends(get_db),
-    api_key: str = Header(None),
+    authorization: str = Header(None),
 ):
-    if api_key != os.getenv("PROJECT_API_KEY"):
+    if "Bearer" not in authorization:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uh uh uh! You didn't say the magic word...",
         )
 
-    try:
-        db.query(User).filter(User.id == user_id).update(
-            {User.is_active: user.dict()["active_status"]}
-        )
-        db.commit()
-        return "User status updated"
-    except SQLAlchemyError:
-        raise HTTPException(
-            status_code=500, detail="Error updating user activation status"
-        )
+    if generate_id_from_token(authorization, user_id):
+
+        try:
+            db.query(User).filter(User.id == user_id).update(
+                {User.is_active: user.dict()["active_status"]}
+            )
+            db.commit()
+            return "User status updated"
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=500, detail="Error updating user activation status"
+            )
+    else:
+        HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
 
 @router.put("/user/subscription", status_code=status.HTTP_200_OK)
@@ -531,17 +537,8 @@ def update_user_subscription_status(
 
 @router.put("/user/password/{user_id}", status_code=status.HTTP_200_OK)
 def update_user_password(
-    user_id: int,
-    user: UserPasswordUpdate,
-    db: Session = Depends(get_db),
-    api_key: str = Header(None),
+    user_id: int, user: UserPasswordUpdate, db: Session = Depends(get_db)
 ):
-    if api_key != os.getenv("PROJECT_API_KEY"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uh uh uh! You didn't say the magic word...",
-        )
-
     new_password_hash = pbkdf2_sha256.hash(user.dict()["password"])
 
     try:
@@ -623,42 +620,34 @@ def verify_user_email(
 def email_timestamp_refresh(
     user: UserEmailVerification,
     db: Session = Depends(get_db),
-    api_key: str = Header(None),
+    authorization: str = Header(None),
 ):
-    if api_key != os.getenv("PROJECT_API_KEY"):
+    if "Bearer" not in authorization:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uh uh uh! You didn't say the magic word...",
         )
 
-    try:
-        db.query(User).filter(User.id == user.id).update(
-            {User.email_verification_timestamp: datetime.utcnow()}
-        )
+    if generate_id_from_token(authorization, user.id):
+        try:
+            db.query(User).filter(User.id == user.id).update(
+                {User.email_verification_timestamp: datetime.utcnow()}
+            )
 
-        db.commit()
+            db.commit()
 
-        return "Email timestamp updated"
-    except SQLAlchemyError:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="The email timestamp could not be updated",
-        )
+            return "Email timestamp updated"
+        except SQLAlchemyError:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="The email timestamp could not be updated",
+            )
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
 
 @router.put("/user/otp_generation", status_code=status.HTTP_201_CREATED)
-def generate_otp(
-    user: UserOtpBase,
-    db: Session = Depends(get_db),
-    api_key: str = Header(None),
-):
-
-    if api_key != os.getenv("PROJECT_API_KEY"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uh uh uh! You didn't say the magic word...",
-        )
-
+def generate_otp(user: UserOtpBase, db: Session = Depends(get_db)):
     email = user.email.lower()
     otp = secrets.token_hex(3).upper()
 
@@ -684,18 +673,8 @@ def generate_otp(
 
 @router.get("/user/verify_otp/{user_id}", status_code=status.HTTP_200_OK)
 def verify_otp(
-    user_id: int,
-    otp: str,
-    timestamp: datetime,
-    db: Session = Depends(get_db),
-    api_key: str = Header(None),
+    user_id: int, otp: str, timestamp: datetime, db: Session = Depends(get_db)
 ):
-    if api_key != os.getenv("PROJECT_API_KEY"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uh uh uh! You didn't say the magic word...",
-        )
-
     try:
         record = (
             db.query(User.otp, User.otp_verification_timestamp)
@@ -729,16 +708,8 @@ def verify_otp(
 
 @router.put("/otp_timestamp/refresh", status_code=status.HTTP_200_OK)
 def otp_timestamp_refresh(
-    user: UserOtpVerification,
-    db: Session = Depends(get_db),
-    api_key: str = Header(None),
+    user: UserOtpVerification, db: Session = Depends(get_db)
 ):
-    if api_key != os.getenv("PROJECT_API_KEY"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uh uh uh! You didn't say the magic word...",
-        )
-
     try:
         db.query(User).filter(User.id == user.id).update(
             {User.otp_verification_timestamp: datetime.utcnow()}
@@ -756,90 +727,100 @@ def otp_timestamp_refresh(
 
 @router.get("/chats/seller/{user_id}", status_code=status.HTTP_200_OK)
 def get_chats_as_seller(
-    user_id: int, db: Session = Depends(get_db), api_key: str = Header(None)
+    user_id: int,
+    db: Session = Depends(get_db),
+    authorization: str = Header(None),
 ):
-
-    if api_key != os.getenv("PROJECT_API_KEY"):
+    if "Bearer" not in authorization:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uh uh uh! You didn't say the magic word...",
         )
 
-    try:
-        return (
-            db.query(
-                User.name.label("buyer_name"),
-                Ad.title.label("ad_title"),
-                Chat.chat_id.label("chat_id"),
-                Chat.ad_id.label("ad_id"),
-                Chat.buyer_id.label("buyer_id"),
-                Chat.seller_id.label("seller_id"),
-                ChatHistory.new_notifications.label("new_chats"),
-                ChatHistory.history[-1]["sender"].label("last_sender"),
-                Chat.marked_del_seller.label("marked_for_deletion"),
-            )
-            .filter(
-                and_(
-                    User.id == Chat.buyer_id,
-                    Ad.id == Chat.ad_id,
-                    Chat.chat_id == ChatHistory.chat_id,
-                    Chat.seller_id == user_id,
-                    Ad.active == True,  # noqa
-                    Chat.marked_del_seller == False,  # noqa
-                )
-            )
-            .all()
-        )
+    if generate_id_from_token(authorization, user_id):
 
-    except SQLAlchemyError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No seller chat record found",
-        )
+        try:
+            return (
+                db.query(
+                    User.name.label("buyer_name"),
+                    Ad.title.label("ad_title"),
+                    Chat.chat_id.label("chat_id"),
+                    Chat.ad_id.label("ad_id"),
+                    Chat.buyer_id.label("buyer_id"),
+                    Chat.seller_id.label("seller_id"),
+                    ChatHistory.new_notifications.label("new_chats"),
+                    ChatHistory.history[-1]["sender"].label("last_sender"),
+                    Chat.marked_del_seller.label("marked_for_deletion"),
+                )
+                .filter(
+                    and_(
+                        User.id == Chat.buyer_id,
+                        Ad.id == Chat.ad_id,
+                        Chat.chat_id == ChatHistory.chat_id,
+                        Chat.seller_id == user_id,
+                        Ad.active == True,  # noqa
+                        Chat.marked_del_seller == False,  # noqa
+                    )
+                )
+                .all()
+            )
+
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No seller chat record found",
+            )
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
 
 @router.get("/chats/buyer/{user_id}", status_code=status.HTTP_200_OK)
 def get_chats_as_buyer(
-    user_id: int, db: Session = Depends(get_db), api_key: str = Header(None)
+    user_id: int,
+    db: Session = Depends(get_db),
+    authorization: str = Header(None),
 ):
-
-    if api_key != os.getenv("PROJECT_API_KEY"):
+    if "Bearer" not in authorization:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uh uh uh! You didn't say the magic word...",
         )
 
-    try:
-        return (
-            db.query(
-                User.name.label("seller_name"),
-                Ad.title.label("ad_title"),
-                Chat.chat_id.label("chat_id"),
-                Chat.ad_id.label("ad_id"),
-                Chat.buyer_id.label("buyer_id"),
-                Chat.seller_id.label("seller_id"),
-                ChatHistory.new_notifications.label("new_chats"),
-                ChatHistory.history[-1]["sender"].label("last_sender"),
-                Chat.marked_del_buyer.label("marked_for_deletion"),
-            )
-            .filter(
-                and_(
-                    User.id == Chat.seller_id,
-                    Ad.id == Chat.ad_id,
-                    Chat.chat_id == ChatHistory.chat_id,
-                    Chat.buyer_id == user_id,
-                    Ad.active == True,  # noqa
-                    Chat.marked_del_buyer == False,  # noqa
-                )
-            )
-            .all()
-        )
+    if generate_id_from_token(authorization, user_id):
 
-    except SQLAlchemyError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No buyer chat record found",
-        )
+        try:
+            return (
+                db.query(
+                    User.name.label("seller_name"),
+                    Ad.title.label("ad_title"),
+                    Chat.chat_id.label("chat_id"),
+                    Chat.ad_id.label("ad_id"),
+                    Chat.buyer_id.label("buyer_id"),
+                    Chat.seller_id.label("seller_id"),
+                    ChatHistory.new_notifications.label("new_chats"),
+                    ChatHistory.history[-1]["sender"].label("last_sender"),
+                    Chat.marked_del_buyer.label("marked_for_deletion"),
+                )
+                .filter(
+                    and_(
+                        User.id == Chat.seller_id,
+                        Ad.id == Chat.ad_id,
+                        Chat.chat_id == ChatHistory.chat_id,
+                        Chat.buyer_id == user_id,
+                        Ad.active == True,  # noqa
+                        Chat.marked_del_buyer == False,  # noqa
+                    )
+                )
+                .all()
+            )
+
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No buyer chat record found",
+            )
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
 
 @router.put("/seller/chat/delete/", status_code=status.HTTP_201_CREATED)
@@ -847,26 +828,31 @@ def mark_seller_chat_for_deletion(
     seller_id: int,
     chat_id: str,
     db: Session = Depends(get_db),
-    api_key: str = Header(None),
+    authorization: str = Header(None),
 ):
-    if api_key != os.getenv("PROJECT_API_KEY"):
+    if "Bearer" not in authorization:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uh uh uh! You didn't say the magic word...",
         )
-    try:
-        db.query(Chat).filter(
-            Chat.seller_id == seller_id, Chat.chat_id == chat_id
-        ).update({Chat.marked_del_seller: True})
 
-        db.commit()
+    if generate_id_from_token(authorization, seller_id):
 
-        return "Chat marked for deletion"
-    except SQLAlchemyError:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not mark record for deletion",
-        )
+        try:
+            db.query(Chat).filter(
+                Chat.seller_id == seller_id, Chat.chat_id == chat_id
+            ).update({Chat.marked_del_seller: True})
+
+            db.commit()
+
+            return "Chat marked for deletion"
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not mark record for deletion",
+            )
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
 
 @router.put("/buyer/chat/delete/", status_code=status.HTTP_201_CREATED)
@@ -874,23 +860,27 @@ def mark_buyer_chat_for_deletion(
     buyer_id: int,
     chat_id: str,
     db: Session = Depends(get_db),
-    api_key: str = Header(None),
+    authorization: str = Header(None),
 ):
-    if api_key != os.getenv("PROJECT_API_KEY"):
+    if "Bearer" not in authorization:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uh uh uh! You didn't say the magic word...",
         )
-    try:
-        db.query(Chat).filter(
-            Chat.buyer_id == buyer_id, Chat.chat_id == chat_id
-        ).update({Chat.marked_del_buyer: True})
 
-        db.commit()
+    if generate_id_from_token(authorization, buyer_id):
+        try:
+            db.query(Chat).filter(
+                Chat.buyer_id == buyer_id, Chat.chat_id == chat_id
+            ).update({Chat.marked_del_buyer: True})
 
-        return "Chat marked for deletion"
-    except SQLAlchemyError:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not mark record for deletion",
-        )
+            db.commit()
+
+            return "Chat marked for deletion"
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not mark record for deletion",
+            )
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)

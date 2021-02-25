@@ -32,6 +32,7 @@ from database.models import Apartment
 from database.models import Chat
 from database.models import ReportedAd
 from database.models import User
+from utils.helpers import generate_id_from_token
 from utils.helpers import get_posted_days
 from utils.helpers import initialize_s3
 
@@ -382,6 +383,9 @@ def update_ad(
     # Convert the string "available_from" to datetime
     available_from = datetime.strptime(available_from, "%Y-%m-%d %H:%M:%S")
     try:
+        if images:
+            upload_files_to_s3(ad_id, posted_by_id, images, db)
+
         db.query(Ad).filter(Ad.id == ad_id).update(
             {
                 Ad.title: title,
@@ -395,8 +399,6 @@ def update_ad(
             }
         )
         db.commit()
-        if images:
-            upload_files_to_s3(ad_id, posted_by_id, images, db)
 
     except SQLAlchemyError:
         raise HTTPException(
@@ -608,29 +610,32 @@ def delete_image(
     ad_id: int,
     image: str,
     db: Session = Depends(get_db),
-    api_key: str = Header(None),
+    authorization: str = Header(None),
 ):
-
-    if api_key != os.getenv("PROJECT_API_KEY"):
+    if "Bearer" not in authorization:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uh uh uh! You didn't say the magic word...",
         )
 
-    try:
-        delete_individual_image(user_id, ad_id, image)
+    if generate_id_from_token(authorization, user_id):
 
-        db.query(AdImage).filter(
-            AdImage.image_path.ilike("%" + image + "%")
-        ).delete(synchronize_session="fetch")
+        try:
+            delete_individual_image(user_id, ad_id, image)
 
-        db.commit()
-        return "Image deleted"
-    except SQLAlchemyError:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Image could not be deleted",
-        )
+            db.query(AdImage).filter(
+                AdImage.image_path.ilike("%" + image + "%")
+            ).delete(synchronize_session="fetch")
+
+            db.commit()
+            return "Image deleted"
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Image could not be deleted",
+            )
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
 
 @router.get("/reported/{ad_id}", status_code=status.HTTP_200_OK)
@@ -661,29 +666,35 @@ def get_reported_ads(
 
 @router.post("/report/ad", status_code=status.HTTP_201_CREATED)
 def report_ad(
-    ad: ReportAd, db: Session = Depends(get_db), api_key: str = Header(None)
+    ad: ReportAd,
+    db: Session = Depends(get_db),
+    authorization: str = Header(None),
 ):
-    if api_key != os.getenv("PROJECT_API_KEY"):
+    if "Bearer" not in authorization:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uh uh uh! You didn't say the magic word...",
         )
 
-    new_report = ReportedAd(
-        ad_id=ad.ad_id,
-        reported_by=ad.reported_by,
-        reason=ad.reason,
-        description=ad.description,
-    )
+    if generate_id_from_token(authorization, ad.reported_by):
 
-    try:
-        db.add(new_report)
-        db.commit()
-
-        return {"msg": f"Ad {ad.ad_id} reported"}
-
-    except SQLAlchemyError:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not report ad",
+        new_report = ReportedAd(
+            ad_id=ad.ad_id,
+            reported_by=ad.reported_by,
+            reason=ad.reason,
+            description=ad.description,
         )
+
+        try:
+            db.add(new_report)
+            db.commit()
+
+            return {"msg": f"Ad {ad.ad_id} reported"}
+
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not report ad",
+            )
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
