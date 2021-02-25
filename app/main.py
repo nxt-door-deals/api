@@ -24,7 +24,6 @@ from routers import (
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
-
 # Create all the database models
 models.Base.metadata.create_all(bind=engine)
 
@@ -42,7 +41,6 @@ middleware = [
 ]
 
 app = FastAPI(middleware=middleware, docs_url=None, redoc_url=None)
-
 
 # Routers go here
 prefix = "/api/v1"

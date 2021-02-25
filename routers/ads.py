@@ -134,6 +134,8 @@ def upload_files_to_s3(
     try:
 
         db.commit()
+
+        return True
     except Exception:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -340,28 +342,29 @@ def create_ad(
         apartment_id=apartment_id,
     )
     try:
-        db.add(new_ad)
-        db.commit()
         if images:
             upload_files_to_s3(new_ad.id, new_ad.posted_by, images, db)
+
+        db.add(new_ad)
+        db.commit()
+        return {
+            "title": title,
+            "description": description,
+            "ad_category": ad_category,
+            "ad_type": ad_type,
+            "price": price,
+            "negotiable": negotiable,
+            "condition": condition,
+            "available_from": available_from,
+            "publish_flat_number": publish_flat_number,
+            "posted_by": posted_by,
+            "apartment_id": apartment_id,
+        }
 
     except SQLAlchemyError:
         raise HTTPException(
             status_code=500, detail="Error creating a new advertisement"
         )
-    return {
-        "title": title,
-        "description": description,
-        "ad_category": ad_category,
-        "ad_type": ad_type,
-        "price": price,
-        "negotiable": negotiable,
-        "condition": condition,
-        "available_from": available_from,
-        "publish_flat_number": publish_flat_number,
-        "posted_by": posted_by,
-        "apartment_id": apartment_id,
-    }
 
 
 # Update an ad
@@ -399,12 +402,12 @@ def update_ad(
             }
         )
         db.commit()
+        return "Ad updated"
 
     except SQLAlchemyError:
         raise HTTPException(
             status_code=500, detail="Error updating advertisement"
         )
-    return "Ad updated"
 
 
 # Mark item as sold
