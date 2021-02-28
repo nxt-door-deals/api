@@ -108,6 +108,12 @@ def upload_files_to_s3(
 
         optimized_image = fix_image_orientation(optimized_image)
 
+        if (
+            optimized_image.width < image_size[0]
+            or optimized_image.height < image_size[1]
+        ):
+            image_size = (optimized_image.width, optimized_image.height)
+
         optimized_image = optimized_image.resize(image_size)
 
         in_mem_file = io.BytesIO()
@@ -342,11 +348,11 @@ def create_ad(
         apartment_id=apartment_id,
     )
     try:
-        if images:
-            upload_files_to_s3(new_ad.id, new_ad.posted_by, images, db)
-
         db.add(new_ad)
         db.commit()
+
+        if images:
+            upload_files_to_s3(new_ad.id, new_ad.posted_by, images, db)
         return {
             "title": title,
             "description": description,
@@ -386,9 +392,6 @@ def update_ad(
     # Convert the string "available_from" to datetime
     available_from = datetime.strptime(available_from, "%Y-%m-%d %H:%M:%S")
     try:
-        if images:
-            upload_files_to_s3(ad_id, posted_by_id, images, db)
-
         db.query(Ad).filter(Ad.id == ad_id).update(
             {
                 Ad.title: title,
@@ -402,6 +405,10 @@ def update_ad(
             }
         )
         db.commit()
+
+        if images:
+            upload_files_to_s3(ad_id, posted_by_id, images, db)
+
         return "Ad updated"
 
     except SQLAlchemyError:
