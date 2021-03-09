@@ -39,14 +39,27 @@ class EmailSend(BaseModel):
 
 
 class NbhEmailSend(EmailSend):
-    apartment_name: Optional[str]
-    address1: Optional[str]
-    address2: Optional[str]
-    city: Optional[str]
-    state: Optional[str]
-    pincode: Optional[str]
-    verificationurl: Optional[str] = None
-    email: Optional[str]
+    apartment_name: str
+    address1: str
+    address2: str
+    city: str
+    state: str
+    pincode: str
+    verificationurl: str
+    email: str
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "from_email": "sender@email.com",
+                "to_email": "sendee@email.com",
+            }
+        }
+
+
+class NbhEmailSendUser(EmailSend):
+    apartment_name: str
+    email: str
 
     class Config:
         schema_extra = {
@@ -137,30 +150,59 @@ def send_email_contact(email: EmailSend, background_task: BackgroundTasks):
         )
 
 
-# Method for the neighbourhood registration emails
-@router.post("/email/send/nbhregistration", status_code=status.HTTP_201_CREATED)
+# Method to send an email to contact@nxtdoordeals.com during registration
+@router.post(
+    "/email/send/nbhregistration", status_code=status.HTTP_202_ACCEPTED
+)
 def send_nbh_registration_email(
     email: NbhEmailSend, background_task: BackgroundTasks
 ):
     message = Mail(from_email=email.from_email, to_emails=email.to_email)
 
-    if email.address1:
-        address1_title = address_formatter(email.address1)
+    email.address1 = address_formatter(email.address1)
 
     if email.address2:
-        address2_title = address_formatter(email.address2)
+        email.address2 = address_formatter(email.address2)
 
     message.dynamic_template_data = {
         "apartment_name": email.apartment_name.title()
         if email.apartment_name
         else None,
-        "address1": address1_title or None,
-        "address2": address2_title or None,
+        "address1": email.address1 or None,
+        "address2": email.address2 or None,
         "city": email.city.title() if email.city else None,
         "state": email.state.title() if email.state else None,
         "pincode": email.pincode or None,
         "email": email.email.lower() if email.email else None,
         "verificationurl": email.verificationurl,
+        "year": email.year or datetime.now().year,
+    }
+
+    message.template_id = os.getenv(email.template_name)
+
+    try:
+        background_task.add_task(send_message, message)
+        return status.HTTP_202_ACCEPTED
+    except Exception:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
+        )
+
+
+# Method to send an email to the user after registration
+@router.post(
+    "/email/send/nbhregistration_user", status_code=status.HTTP_202_ACCEPTED
+)
+def send_nbh_registration_email_to_user(
+    email: NbhEmailSendUser, background_task: BackgroundTasks
+):
+    message = Mail(from_email=email.from_email, to_emails=email.to_email)
+
+    message.dynamic_template_data = {
+        "apartment_name": email.apartment_name.title()
+        if email.apartment_name
+        else None,
+        "email": email.email.lower() if email.email else None,
         "year": email.year or datetime.now().year,
     }
 

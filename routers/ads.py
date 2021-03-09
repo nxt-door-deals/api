@@ -2,6 +2,7 @@ import io
 import os
 import uuid
 from datetime import datetime
+from datetime import timedelta
 from decimal import Decimal
 from math import trunc
 from typing import List
@@ -180,7 +181,11 @@ def get_ads(records: List, db: Session):
     ad_list = []
     ad_data = {}
 
+    today = datetime.today().date()
+    tdelta = timedelta(days=30)
+
     for record in records:
+
         # Check if ad was reported more than 5 times
         ad_reported_record = reported_ad_check(record.id, db)
 
@@ -201,7 +206,9 @@ def get_ads(records: List, db: Session):
             ad_data["condition"] = record.condition
             ad_data["chat_record_count"] = chat_record
 
-            ad_list.append(ad_data.copy())
+            # Don't add the ad to the list if it is older than 30 days
+            if record.created_on.date() + tdelta > today:
+                ad_list.append(ad_data.copy())
     return ad_list
 
 
@@ -239,16 +246,26 @@ def reported_ad_check(ad_id: int, db: Session = Depends(get_db)):
 
 # End points
 
-# Fetch ad from ad id
+# Fetch ad from ad id - returning None will redirect to 404.js
 @router.get("/ads/{id}", status_code=status.HTTP_200_OK)
 def get_ad_details_from_id(id: int, db: Session = Depends(get_db)):
 
     ad = {}
 
+    today = datetime.today().date()
+    tdelta = timedelta(days=30)
+
     try:
         ad_record = (
             db.query(Ad).filter(Ad.id == id, Ad.active == True).first()  # noqa
         )
+
+        if not ad_record:
+            return None
+
+        # Check if ad is older than 30 days
+        if not ad_record.created_on.date() + tdelta > today:
+            return None
 
         neighbourhood = (
             db.query(Apartment.name)
@@ -263,12 +280,9 @@ def get_ad_details_from_id(id: int, db: Session = Depends(get_db)):
         if ad_reported_record:
             return None
 
-        if not ad_record:
-            return None
-        else:
-            user_record = (
-                db.query(User).filter(User.id == ad_record.posted_by).first()
-            )
+        user_record = (
+            db.query(User).filter(User.id == ad_record.posted_by).first()
+        )
 
         price = format_price(ad_record.price)
         ad_images = get_images_from_s3(ad_record.id, db)

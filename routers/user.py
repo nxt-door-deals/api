@@ -561,9 +561,9 @@ def verify_user_email(
     token: str, user: UserEmailVerification, db: Session = Depends(get_db)
 ):
 
-    message_tamper = 'Uh oh! There seems to be a problem with the verification link. Please try again with the link provided in our original email. Alternately, you can use the "Resend Email" option from your user account page'
+    message_tamper = 'Uh oh! There seems to be a problem with the verification link. Please try again with the link provided in our original email. Alternately, you can use the <span class="text-purple-500 font-semibold">Resend Email</span> option from your user account page.'
 
-    message_hours_elapsed = 'It has been over 24 hours since we sent the verification link. Please use the "Resend Email" option from your user account page to generate a new link'
+    message_hours_elapsed = 'It has been over 24 hours since we sent the verification link. Please use the <span class="text-purple-500 font-semibold">Resend Email</span> option from your user account page to generate a new link.'
 
     split_token = token.split("|")
 
@@ -599,7 +599,10 @@ def verify_user_email(
             - record.email_verification_timestamp.replace(tzinfo=pytz.UTC)
         )
         if int(date_diff.total_seconds() / 3600) > 24:
-            return message_hours_elapsed
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=message_hours_elapsed,
+            )
 
         db.query(User).filter(
             and_(User.id == user_id, User.email_verification_hash == hash)
