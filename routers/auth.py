@@ -1,5 +1,6 @@
 import os
 from collections import namedtuple
+from datetime import date
 from datetime import datetime
 from datetime import timedelta
 from typing import Optional
@@ -14,10 +15,14 @@ from jose import JWTError
 from passlib.hash import pbkdf2_sha256
 from pydantic import BaseModel
 from sqlalchemy import and_
+from sqlalchemy import cast
+from sqlalchemy import Date
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from . import get_db
 from . import router
+from database.models import Ad
 from database.models import Apartment
 from database.models import User
 
@@ -84,6 +89,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def get_current_user(
     db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)
 ):
+    tdelta = timedelta(days=int(os.getenv("AD_EXPIRATION_TIME_DELTA")))
     credentials_exception = HTTPException(
         status_code=401,
         detail="Sorry! We could not validate those credentials",
@@ -126,11 +132,33 @@ def get_current_user(
             User.ads_path,
             User.profile_path,
             Apartment.name,
+            func.count(Ad.id),
         )
         .filter(
             and_(
-                User.id == int(token_data.id), User.apartment_id == Apartment.id
+                User.id == int(token_data.id),
+                User.apartment_id == Apartment.id,
+                User.id == Ad.posted_by,
+                Ad.active == True,  # noqa
+                cast(Ad.created_on, Date) + tdelta > date.today(),
             )
+        )
+        .group_by(
+            User.id,
+            User.name,
+            User.email,
+            User.is_active,
+            User.mobile,
+            User.mail_subscribed,
+            User.otp,
+            User.email_verified,
+            User.email_verification_hash,
+            User.email_verification_timestamp,
+            User.apartment_id,
+            User.apartment_number,
+            User.ads_path,
+            User.profile_path,
+            Apartment.name,
         )
         .first()
     )
@@ -140,7 +168,7 @@ def get_current_user(
 
     CurrentUser = namedtuple(
         "CurrentUser",
-        "id name email is_active mobile mail_subscribed otp email_verified email_verification_hash email_verification_timestamp apartment_id apartment_number ads_path profile_path apartment_name",
+        "id name email is_active mobile mail_subscribed otp email_verified email_verification_hash email_verification_timestamp apartment_id apartment_number ads_path profile_path apartment_name ad_count",
     )
 
     user_dict = CurrentUser._make(user)._asdict()
@@ -163,6 +191,7 @@ def get_current_user(
         "ads_path": user_dict["ads_path"],
         "profile_path": user_dict["profile_path"],
         "apartment_name": user_dict["apartment_name"],
+        "ad_count": user_dict["ad_count"],
     }
 
 

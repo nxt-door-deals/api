@@ -1,6 +1,7 @@
 import io
 import os
 import uuid
+from datetime import date
 from datetime import datetime
 from datetime import timedelta
 from decimal import Decimal
@@ -20,6 +21,8 @@ from PIL import ExifTags
 from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy import and_
+from sqlalchemy import cast
+from sqlalchemy import Date
 from sqlalchemy import func
 from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
@@ -182,7 +185,7 @@ def get_ads(records: List, db: Session):
     ad_data = {}
 
     today = datetime.today().date()
-    tdelta = timedelta(days=30)
+    tdelta = timedelta(days=int(os.getenv("AD_EXPIRATION_TIME_DELTA")))
 
     for record in records:
 
@@ -244,7 +247,55 @@ def reported_ad_check(ad_id: int, db: Session = Depends(get_db)):
     )
 
 
+def list_all_ads(db: Session = Depends(get_db)):
+    tdelta = timedelta(days=int(os.getenv("AD_EXPIRATION_TIME_DELTA")))
+    try:
+        return (
+            db.query(Ad)
+            .filter(
+                Ad.active == True,  # noqa
+                cast(Ad.created_on, Date) + tdelta > date.today(),
+            )
+            .all()
+        )
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not fetch all ads",
+        )
+
+
+def increment_user_ad_count(user_id: int, db: Session = Depends(get_db)):
+    try:
+        # Get current ad count for the user
+        current_ad_count = (
+            db.query(User.ads_to_date).filter(User.id == user_id).first()
+        )
+
+        # Increment the count
+        db.query(User).filter(User.id == user_id).update(
+            {User.ads_to_date: current_ad_count[0] + 1}
+        )
+
+        db.commit()
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not increment ad count",
+        )
+
+
 # End points
+@router.get("/ads/all", status_code=status.HTTP_200_OK)
+def get_all_ads(db: Session = Depends(get_db)):
+    ads = list_all_ads(db)
+
+    if not ads:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ads not found"
+        )
+    return ads
+
 
 # Fetch ad from ad id - returning None will redirect to 404.js
 @router.get("/ads/{id}", status_code=status.HTTP_200_OK)
@@ -253,7 +304,7 @@ def get_ad_details_from_id(id: int, db: Session = Depends(get_db)):
     ad = {}
 
     today = datetime.today().date()
-    tdelta = timedelta(days=30)
+    tdelta = timedelta(days=int(os.getenv("AD_EXPIRATION_TIME_DELTA")))
 
     try:
         ad_record = (
@@ -364,6 +415,8 @@ def create_ad(
     try:
         db.add(new_ad)
         db.commit()
+
+        increment_user_ad_count(posted_by, db)
 
         if images:
             upload_files_to_s3(new_ad.id, new_ad.posted_by, images, db)

@@ -60,7 +60,7 @@ def get_all_apartments(db: Session):
         return db.query(Apartment).all()
     except SQLAlchemyError:
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error encountered while fetching apartments",
         )
 
@@ -75,7 +75,9 @@ def get_apartments(db: Session = Depends(get_db)):
     apartment = get_all_apartments(db)
 
     if not apartment:
-        raise HTTPException(status_code=404, detail="Apartments not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Apartments not found"
+        )
     return apartment
 
 
@@ -208,10 +210,14 @@ def verify_neighbourhood(
 
 
 @router.get("/apartments/{id}", status_code=status.HTTP_200_OK)
-def get_apartment_From_id(id: int, db: Session = Depends(get_db)):
+def get_apartment_from_id(id: int, db: Session = Depends(get_db)):
 
     try:
-        record = db.query(Apartment).filter(Apartment.id == id).first()
+        record = (
+            db.query(Apartment)
+            .filter(Apartment.id == id, Apartment.verified == True)  # noqa
+            .first()
+        )
 
         if not record:
             return None

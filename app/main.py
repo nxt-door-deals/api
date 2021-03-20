@@ -19,6 +19,7 @@ from routers import (
     user,
     chat,
     websocket_server,
+    sitemap,
 )
 
 from starlette.middleware import Middleware
@@ -54,3 +55,4 @@ app.include_router(email_messages.router, prefix=prefix)
 app.include_router(ads.router, prefix=prefix)
 app.include_router(chat.router, prefix=prefix)
 app.include_router(websocket_server.router)
+app.include_router(sitemap.router, prefix=prefix)

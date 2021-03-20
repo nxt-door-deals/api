@@ -35,6 +35,7 @@ class User(Base):
     email_verification_timestamp = Column(DateTime)
     profile_path = Column(String(500))
     ads_path = Column(String(500))
+    ads_to_date = Column(Integer, default=0)
 
     apartment = relationship("Apartment")
 

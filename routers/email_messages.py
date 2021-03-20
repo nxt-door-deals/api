@@ -70,12 +70,29 @@ class NbhEmailSendUser(EmailSend):
         }
 
 
+class ReportedAdEmail(EmailSend):
+    description: Optional[str]
+    ad_title: str
+    ad_id: Optional[int]
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "from_email": "sender@email.com",
+                "to_email": "sendee@email.com",
+                "description": "some description",
+                "ad_id": 1,
+            }
+        }
+
+
 # Helpers
 def send_message(message: Mail):
     sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
     sg.send(message)
 
 
+# Endpoints
 @router.post("/email/send", status_code=status.HTTP_202_ACCEPTED)
 def send_email(email: EmailSend, background_task: BackgroundTasks):
     message = Mail(from_email=email.from_email, to_emails=email.to_email)
@@ -143,7 +160,7 @@ def send_email_contact(email: EmailSend, background_task: BackgroundTasks):
     )
     try:
         background_task.add_task(send_message, message)
-        return "Thanks for contacting us!"
+        return "We'll be in touch soon!"
     except Exception:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
@@ -203,6 +220,35 @@ def send_nbh_registration_email_to_user(
         if email.apartment_name
         else None,
         "email": email.email.lower() if email.email else None,
+        "year": email.year or datetime.now().year,
+    }
+
+    message.template_id = os.getenv(email.template_name)
+
+    try:
+        background_task.add_task(send_message, message)
+        return status.HTTP_202_ACCEPTED
+    except Exception:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
+        )
+
+
+# Send email to seller and us when an ad is reported or removed
+@router.post("/email/reported_ad/", status_code=status.HTTP_202_ACCEPTED)
+def send_reported_ad_email_to_user(
+    email: ReportedAdEmail, background_task: BackgroundTasks
+):
+
+    if email.template_name == "REPORTED_AD_NOTIFY_OWNERS_TEMPLATE":
+        email.to_email = email.from_email
+
+    message = Mail(from_email=email.from_email, to_emails=email.to_email)
+
+    message.dynamic_template_data = {
+        "description": email.description,
+        "ad_title": email.ad_title,
+        "ad_id": email.ad_id,
         "year": email.year or datetime.now().year,
     }
 

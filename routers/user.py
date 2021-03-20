@@ -1,7 +1,9 @@
 import hashlib
 import os
 import secrets
+from datetime import date
 from datetime import datetime
+from datetime import timedelta
 from typing import List
 from typing import Optional
 
@@ -14,6 +16,8 @@ from fastapi import status
 from passlib.hash import pbkdf2_sha256
 from pydantic import BaseModel
 from sqlalchemy import and_
+from sqlalchemy import cast
+from sqlalchemy import Date
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -285,7 +289,7 @@ def fetch_user(user_id: int, db: Session = Depends(get_db)):
             return {
                 "name": fetched_user.name,
                 "email": fetched_user.email,
-                "mobile": fetched_user.mobile,
+                # "mobile": fetched_user.mobile,
                 "apartment_id": fetched_user.apartment_id,
                 "active_status": fetched_user.is_active,
             }
@@ -741,7 +745,7 @@ def get_chats_as_seller(
         )
 
     if generate_id_from_token(authorization, user_id):
-
+        tdelta = timedelta(days=int(os.getenv("AD_EXPIRATION_TIME_DELTA")))
         try:
             return (
                 db.query(
@@ -761,6 +765,7 @@ def get_chats_as_seller(
                         Ad.id == Chat.ad_id,
                         Chat.chat_id == ChatHistory.chat_id,
                         Chat.seller_id == user_id,
+                        cast(Ad.created_on, Date) + tdelta > date.today(),
                         Ad.active == True,  # noqa
                         Chat.marked_del_seller == False,  # noqa
                     )
@@ -790,6 +795,7 @@ def get_chats_as_buyer(
         )
 
     if generate_id_from_token(authorization, user_id):
+        tdelta = timedelta(days=int(os.getenv("AD_EXPIRATION_TIME_DELTA")))
 
         try:
             return (
@@ -810,6 +816,7 @@ def get_chats_as_buyer(
                         Ad.id == Chat.ad_id,
                         Chat.chat_id == ChatHistory.chat_id,
                         Chat.buyer_id == user_id,
+                        cast(Ad.created_on, Date) + tdelta > date.today(),
                         Ad.active == True,  # noqa
                         Chat.marked_del_buyer == False,  # noqa
                     )
