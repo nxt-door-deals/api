@@ -115,6 +115,18 @@ def get_current_user(
     except JWTError:
         raise credentials_exception
 
+    # Check the count of the current valid ads
+    ad = (
+        db.query(User.id, func.count(Ad.id))
+        .filter(
+            Ad.posted_by == int(token_data.id),
+            Ad.active == True,  # noqa
+            cast(Ad.created_on, Date) + tdelta > date.today(),
+        )
+        .group_by(User.id)
+        .first()
+    )
+
     user = (
         db.query(
             User.id,
@@ -132,15 +144,10 @@ def get_current_user(
             User.ads_path,
             User.profile_path,
             Apartment.name,
-            func.count(Ad.id),
         )
         .filter(
             and_(
-                User.id == int(token_data.id),
-                User.apartment_id == Apartment.id,
-                User.id == Ad.posted_by,
-                Ad.active == True,  # noqa
-                cast(Ad.created_on, Date) + tdelta > date.today(),
+                User.id == int(token_data.id), User.apartment_id == Apartment.id
             )
         )
         .group_by(
@@ -168,7 +175,7 @@ def get_current_user(
 
     CurrentUser = namedtuple(
         "CurrentUser",
-        "id name email is_active mobile mail_subscribed otp email_verified email_verification_hash email_verification_timestamp apartment_id apartment_number ads_path profile_path apartment_name ad_count",
+        "id name email is_active mobile mail_subscribed otp email_verified email_verification_hash email_verification_timestamp apartment_id apartment_number ads_path profile_path apartment_name",
     )
 
     user_dict = CurrentUser._make(user)._asdict()
@@ -191,7 +198,7 @@ def get_current_user(
         "ads_path": user_dict["ads_path"],
         "profile_path": user_dict["profile_path"],
         "apartment_name": user_dict["apartment_name"],
-        "ad_count": user_dict["ad_count"],
+        "ad_count": 0 if not ad else ad[1],
     }
 
 
