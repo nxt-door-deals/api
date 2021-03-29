@@ -36,6 +36,8 @@ class User(Base):
     profile_path = Column(String(500))
     ads_path = Column(String(500))
     ads_to_date = Column(Integer, default=0)
+    premium_user = Column(Boolean, default=False)
+    business_user = Column(Boolean, default=False)
 
     apartment = relationship("Apartment")
 
