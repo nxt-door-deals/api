@@ -696,15 +696,14 @@ def delete_image(
         )
 
     if generate_id_from_token(authorization, user_id):
-
         try:
-            delete_individual_image(user_id, ad_id, image)
-
             db.query(AdImage).filter(
                 AdImage.image_path.ilike("%" + image + "%")
             ).delete(synchronize_session="fetch")
 
             db.commit()
+
+            delete_individual_image(user_id, ad_id, image)
             return "Image deleted"
         except SQLAlchemyError:
             raise HTTPException(
