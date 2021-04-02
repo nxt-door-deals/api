@@ -5,9 +5,9 @@ from datetime import timedelta
 from fastapi import Depends
 from fastapi import HTTPException
 from fastapi import status
+from sentry_sdk import capture_exception
 from sqlalchemy import cast
 from sqlalchemy import Date
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from . import get_db
@@ -61,7 +61,8 @@ def generate_sitemap(db: Session = Depends(get_db)):
         [routes.append(f"/faqs/{faq}") for faq in faqs]
 
         return routes
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not fetch urls",

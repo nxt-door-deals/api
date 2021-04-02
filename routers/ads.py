@@ -20,12 +20,12 @@ from fastapi import UploadFile
 from PIL import ExifTags
 from PIL import Image
 from pydantic import BaseModel
+from sentry_sdk import capture_exception
 from sqlalchemy import and_
 from sqlalchemy import cast
 from sqlalchemy import Date
 from sqlalchemy import func
 from sqlalchemy import or_
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from . import get_db
@@ -147,6 +147,7 @@ def upload_files_to_s3(
 
         return True
     except Exception:
+        capture_exception()
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail="Could not make an image entry in the database",
@@ -234,6 +235,7 @@ def delete_individual_image(user_id: int, ad_id: int, image: str):
 
         return "Image deleted"
     except Exception:
+        capture_exception()
         return "Image not deleted"
 
 
@@ -258,7 +260,8 @@ def list_all_ads(db: Session = Depends(get_db)):
             )
             .all()
         )
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not fetch all ads",
@@ -278,7 +281,8 @@ def increment_user_ad_count(user_id: int, db: Session = Depends(get_db)):
         )
 
         db.commit()
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not increment ad count",
@@ -372,7 +376,8 @@ def get_ad_details_from_id(id: int, db: Session = Depends(get_db)):
         ad["posted_by_email"] = user_record.email
 
         return ad
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not fetch ad details",
@@ -434,7 +439,8 @@ def create_ad(
             "apartment_id": apartment_id,
         }
 
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=500, detail="Error creating a new advertisement"
         )
@@ -478,7 +484,8 @@ def update_ad(
 
         return "Ad updated"
 
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=500, detail="Error updating advertisement"
         )
@@ -498,7 +505,8 @@ def mark_ad_as_sold(
     try:
         db.query(Ad).filter(Ad.id == ad_id).update({Ad.sold: True})
         db.commit()
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could nt mark item as sold",
@@ -508,27 +516,33 @@ def mark_ad_as_sold(
 # Get ads for a particular neighbourhood
 @router.get("/nbhads/get/{nbh_id}", status_code=status.HTTP_200_OK)
 def get_ads_for_neighbourhood(nbh_id: int, db: Session = Depends(get_db)):
-    records = (
-        db.query(Ad)
-        .filter(and_(Ad.apartment_id == nbh_id, Ad.active == True))  # noqa
-        .order_by(Ad.created_on.desc())
-        .all()
-    )
+    try:
+        records = (
+            db.query(Ad)
+            .filter(and_(Ad.apartment_id == nbh_id, Ad.active == True))  # noqa
+            .order_by(Ad.created_on.desc())
+            .all()
+        )
 
-    return get_ads(records, db)
+        return get_ads(records, db)
+    except Exception as e:
+        capture_exception(e)
 
 
 # Get ads for a particular user
 @router.get("/userads/get/{user_id}", status_code=status.HTTP_200_OK)
 def get_ads_for_user(user_id: int, db: Session = Depends(get_db)):
-    records = (
-        db.query(Ad)
-        .filter(and_(Ad.posted_by == user_id, Ad.active == True))  # noqa
-        .order_by(Ad.created_on.desc())
-        .all()
-    )
+    try:
+        records = (
+            db.query(Ad)
+            .filter(and_(Ad.posted_by == user_id, Ad.active == True))  # noqa
+            .order_by(Ad.created_on.desc())
+            .all()
+        )
 
-    return get_ads(records, db)
+        return get_ads(records, db)
+    except Exception as e:
+        capture_exception(e)
 
 
 # Search ads
@@ -536,149 +550,172 @@ def get_ads_for_user(user_id: int, db: Session = Depends(get_db)):
 def search_ads(
     nbh_id: int, category: str, search_text: str, db: Session = Depends(get_db)
 ):
+    try:
+        category = category or "%"
+        search_text = "%" + search_text + "%" if search_text else "%"
 
-    category = category or "%"
-    search_text = "%" + search_text + "%" if search_text else "%"
-
-    search_results = (
-        db.query(Ad)
-        .filter(
-            and_(
-                Ad.ad_category.ilike(category),
-                Ad.apartment_id == nbh_id,
-                Ad.active == True,  # noqa
-                or_(
-                    Ad.title.ilike(search_text),
-                    Ad.description.ilike(search_text),
-                ),
+        search_results = (
+            db.query(Ad)
+            .filter(
+                and_(
+                    Ad.ad_category.ilike(category),
+                    Ad.apartment_id == nbh_id,
+                    Ad.active == True,  # noqa
+                    or_(
+                        Ad.title.ilike(search_text),
+                        Ad.description.ilike(search_text),
+                    ),
+                )
             )
+            .order_by(Ad.created_on.desc())
+            .all()
         )
-        .order_by(Ad.created_on.desc())
-        .all()
-    )
 
-    return get_ads(search_results, db)
+        return get_ads(search_results, db)
+    except Exception as e:
+        capture_exception(e)
 
 
 # Search giveaways
 @router.get("/search/ads/giveaway", status_code=status.HTTP_200_OK)
 def search_giveaways(nbh_id: int, db: Session = Depends(get_db)):
-    giveaway_list = (
-        db.query(Ad)
-        .filter(
-            and_(
-                Ad.apartment_id == nbh_id,
-                Ad.ad_type == "giveaway",
-                Ad.active == True,  # noqa
+    try:
+        giveaway_list = (
+            db.query(Ad)
+            .filter(
+                and_(
+                    Ad.apartment_id == nbh_id,
+                    Ad.ad_type == "giveaway",
+                    Ad.active == True,  # noqa
+                )
             )
+            .order_by(Ad.created_on.desc())
+            .all()
         )
-        .order_by(Ad.created_on.desc())
-        .all()
-    )
 
-    return get_ads(giveaway_list, db)
+        return get_ads(giveaway_list, db)
+    except Exception as e:
+        capture_exception(e)
 
 
 # Sort by price - ascending
 @router.get("/sort/ads/price_asc", status_code=status.HTTP_200_OK)
 def sort_by_price_asc(nbh_id: int, db: Session = Depends(get_db)):
-    price_asc_list = (
-        db.query(Ad)
-        .filter(
-            and_(
-                Ad.apartment_id == nbh_id,
-                Ad.ad_type == "sale",
-                Ad.active == True,  # noqa
+    try:
+        price_asc_list = (
+            db.query(Ad)
+            .filter(
+                and_(
+                    Ad.apartment_id == nbh_id,
+                    Ad.ad_type == "sale",
+                    Ad.active == True,  # noqa
+                )
             )
+            .order_by(Ad.price)
+            .all()
         )
-        .order_by(Ad.price)
-        .all()
-    )
 
-    return get_ads(price_asc_list, db)
+        return get_ads(price_asc_list, db)
+    except Exception as e:
+        capture_exception(e)
 
 
 # Sort by price - descending
 @router.get("/sort/ads/price_desc", status_code=status.HTTP_200_OK)
 def sort_by_price_desc(nbh_id: int, db: Session = Depends(get_db)):
-    price_desc_list = (
-        db.query(Ad)
-        .filter(
-            and_(
-                Ad.apartment_id == nbh_id,
-                Ad.ad_type == "sale",
-                Ad.active == True,  # noqa
+    try:
+        price_desc_list = (
+            db.query(Ad)
+            .filter(
+                and_(
+                    Ad.apartment_id == nbh_id,
+                    Ad.ad_type == "sale",
+                    Ad.active == True,  # noqa
+                )
             )
+            .order_by(Ad.price.desc())
+            .all()
         )
-        .order_by(Ad.price.desc())
-        .all()
-    )
 
-    return get_ads(price_desc_list, db)
+        return get_ads(price_desc_list, db)
+    except Exception as e:
+        capture_exception(e)
 
 
 # Sort by date posted - ascending
 @router.get("/sort/ads/created_asc", status_code=status.HTTP_200_OK)
 def sort_by_created_asc(nbh_id: int, db: Session = Depends(get_db)):
-    created_asc_list = (
-        db.query(Ad)
-        .filter(Ad.apartment_id == nbh_id, Ad.active == True)  # noqa
-        .order_by(Ad.created_on)
-        .all()
-    )
+    try:
+        created_asc_list = (
+            db.query(Ad)
+            .filter(Ad.apartment_id == nbh_id, Ad.active == True)  # noqa
+            .order_by(Ad.created_on)
+            .all()
+        )
 
-    return get_ads(created_asc_list, db)
+        return get_ads(created_asc_list, db)
+    except Exception as e:
+        capture_exception(e)
 
 
 # Sort by date posted - descending
 @router.get("/sort/ads/created_desc", status_code=status.HTTP_200_OK)
 def sort_by_created_desc(nbh_id: int, db: Session = Depends(get_db)):
-    created_desc_list = (
-        db.query(Ad)
-        .filter(Ad.apartment_id == nbh_id, Ad.active == True)  # noqa
-        .order_by(Ad.created_on.desc())
-        .all()
-    )
+    try:
+        created_desc_list = (
+            db.query(Ad)
+            .filter(Ad.apartment_id == nbh_id, Ad.active == True)  # noqa
+            .order_by(Ad.created_on.desc())
+            .all()
+        )
 
-    return get_ads(created_desc_list, db)
+        return get_ads(created_desc_list, db)
+    except Exception as e:
+        capture_exception(e)
 
 
 # Giveaway - ascending
 @router.get("/sort/ads/giveaway_asc", status_code=status.HTTP_200_OK)
 def sort_by_giveaway_asc(nbh_id: int, db: Session = Depends(get_db)):
-    giveaway_asc_list = (
-        db.query(Ad)
-        .filter(
-            and_(
-                Ad.apartment_id == nbh_id,
-                Ad.ad_type == "giveaway",
-                Ad.active == True,  # noqa
+    try:
+        giveaway_asc_list = (
+            db.query(Ad)
+            .filter(
+                and_(
+                    Ad.apartment_id == nbh_id,
+                    Ad.ad_type == "giveaway",
+                    Ad.active == True,  # noqa
+                )
             )
+            .order_by(Ad.created_on)
+            .all()
         )
-        .order_by(Ad.created_on)
-        .all()
-    )
 
-    return get_ads(giveaway_asc_list, db)
+        return get_ads(giveaway_asc_list, db)
+    except Exception as e:
+        capture_exception(e)
 
 
 # Giveaway - descending
 @router.get("/sort/ads/giveaway_desc", status_code=status.HTTP_200_OK)
 def sort_by_giveaway_desc(nbh_id: int, db: Session = Depends(get_db)):
-    giveaway_desc_list = (
-        db.query(Ad)
-        .filter(
-            and_(
-                Ad.apartment_id == nbh_id,
-                Ad.ad_type == "giveaway",
-                Ad.active == True,  # noqa
+    try:
+        giveaway_desc_list = (
+            db.query(Ad)
+            .filter(
+                and_(
+                    Ad.apartment_id == nbh_id,
+                    Ad.ad_type == "giveaway",
+                    Ad.active == True,  # noqa
+                )
             )
+            .order_by(Ad.created_on.desc())
+            .all()
         )
-        .order_by(Ad.created_on.desc())
-        .all()
-    )
 
-    return get_ads(giveaway_desc_list, db)
+        return get_ads(giveaway_desc_list, db)
+    except Exception as e:
+        capture_exception(e)
 
 
 @router.delete("/image/delete", status_code=status.HTTP_202_ACCEPTED)
@@ -705,7 +742,8 @@ def delete_image(
 
             delete_individual_image(user_id, ad_id, image)
             return "Image deleted"
-        except SQLAlchemyError:
+        except Exception as e:
+            capture_exception(e)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Image could not be deleted",
@@ -734,7 +772,8 @@ def get_reported_ads(
                 reported_ad.reported_by for reported_ad in reported_ad_records
             ]
         }
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="No records found"
         )
@@ -767,7 +806,8 @@ def report_ad(
 
             return {"msg": f"Ad {ad.ad_id} reported"}
 
-        except SQLAlchemyError:
+        except Exception as e:
+            capture_exception(e)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Could not report ad",

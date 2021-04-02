@@ -1,6 +1,8 @@
 import os
 
+import sentry_sdk
 from dotenv import load_dotenv
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
 # Load environment variables
 load_dotenv()
@@ -22,7 +24,6 @@ from routers import (
     sitemap,
 )
 
-from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
 # Create all the database models
@@ -31,17 +32,18 @@ models.Base.metadata.create_all(bind=engine)
 # Middleware definitions go here
 origins = [os.getenv("CORS_ORIGIN_SERVER")]
 
-middleware = [
-    Middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-]
 
-app = FastAPI(middleware=middleware, docs_url=None, redoc_url=None)
+sentry_sdk.init(dsn=os.getenv("SENTRY_DSN"))
+
+app = FastAPI(docs_url=None, redoc_url=None)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(SentryAsgiMiddleware)
 
 # Routers go here
 prefix = "/api/v1"

@@ -6,6 +6,7 @@ from better_profanity import profanity
 from fastapi import Depends
 from fastapi import WebSocket
 from fastapi import WebSocketDisconnect
+from sentry_sdk import capture_exception
 from sqlalchemy.orm import Session
 
 from . import get_db
@@ -104,25 +105,31 @@ def save_chat_message(data: str, chat_id: str, db: Session):
     message_list = []
     message_json = json.loads(data)
 
-    chat_history = (
-        db.query(ChatHistory).filter(ChatHistory.chat_id == chat_id).first()
-    )
+    try:
+        chat_history = (
+            db.query(ChatHistory).filter(ChatHistory.chat_id == chat_id).first()
+        )
 
-    if chat_history.history:
-        message_list = [history for history in chat_history.history]
+        if chat_history.history:
+            message_list = [history for history in chat_history.history]
 
-    message_list.append(message_json)
+        message_list.append(message_json)
 
-    db.query(ChatHistory).filter(ChatHistory.chat_id == chat_id).update(
-        {ChatHistory.history: message_list, ChatHistory.new_notifications: True}
-    )
+        db.query(ChatHistory).filter(ChatHistory.chat_id == chat_id).update(
+            {
+                ChatHistory.history: message_list,
+                ChatHistory.new_notifications: True,
+            }
+        )
 
-    # Update the "marked delete" columns so that the chat is visible in the user account
-    db.query(Chat).filter(Chat.chat_id == chat_id).update(
-        {Chat.marked_del_buyer: False, Chat.marked_del_seller: False}
-    )
+        # Update the "marked delete" columns so that the chat is visible in the user account
+        db.query(Chat).filter(Chat.chat_id == chat_id).update(
+            {Chat.marked_del_buyer: False, Chat.marked_del_seller: False}
+        )
 
-    db.commit()
+        db.commit()
+    except Exception as e:
+        capture_exception(e)
 
 
 # End points
@@ -150,6 +157,7 @@ async def default_websocket(
                 await manager.broadcast(data, chat_id)
 
         except WebSocketDisconnect:
+            capture_exception()
             manager.disconnect(websocket, chat_id)
     else:
         await handle_rejected_connections(websocket)

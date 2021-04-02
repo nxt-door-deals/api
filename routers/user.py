@@ -15,10 +15,10 @@ from fastapi import HTTPException
 from fastapi import status
 from passlib.hash import pbkdf2_sha256
 from pydantic import BaseModel
+from sentry_sdk import capture_exception
 from sqlalchemy import and_
 from sqlalchemy import cast
 from sqlalchemy import Date
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from . import get_db
@@ -146,7 +146,8 @@ def create_user_folders_in_s3(id: int):
 
         if len(response) == 2:
             return True
-    except Exception:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
             detail="Unable to connect to the storage service",
@@ -170,7 +171,8 @@ def delete_s3_user_folder(user_id: int):
         else:
             return "No folders to delete"
 
-    except Exception:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
             detail="There was an error deleting the user folder",
@@ -196,7 +198,8 @@ def delete_s3_ad_folders(user_id: int, ad_id: int):
         else:
             return "No ad folders to delete"
 
-    except Exception:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
             detail="There was an error deleting the ad folders",
@@ -223,7 +226,8 @@ def delete_user_ads(user_id: int, ads: List, db: Session):
         )
 
         db.commit()
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to delete user ads",
@@ -243,7 +247,8 @@ def delete_selected_ad(ad_id: int, db: Session):
         db.query(Ad).filter(Ad.id == ad_id).update({Ad.active: False})
 
         db.commit()
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to delete user ads",
@@ -259,7 +264,8 @@ def delete_user_records(user_id: int, ads: List, db: Session):
         )
 
         db.commit()
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to delete user records",
@@ -296,7 +302,8 @@ def fetch_user(user_id: int, db: Session = Depends(get_db)):
         else:
             return None
 
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=500, detail="Unable to fetch user details"
         )
@@ -369,7 +376,8 @@ def register_user(
         )
 
         db.commit()
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=500, detail="Error encountered while registering user"
         )
@@ -408,7 +416,8 @@ def delete_user(
             ads = get_user_ads(user_id, db)
 
             background_task.add_task(delete_user_records, user_id, ads, db)
-        except SQLAlchemyError:
+        except Exception as e:
+            capture_exception(e)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Unable to delete user",
@@ -436,7 +445,8 @@ def delete_user_ad(
             delete_s3_ad_folders(user_id, ad_id)
 
             delete_selected_ad(ad_id, db)
-        except SQLAlchemyError:
+        except Exception as e:
+            capture_exception(e)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Unable to delete user ads",
@@ -475,7 +485,8 @@ def update_user(
 
             db.commit()
             return user_to_update
-        except SQLAlchemyError:
+        except Exception as e:
+            capture_exception(e)
             raise HTTPException(
                 status_code=500, detail="Unable to update user details"
             )
@@ -504,7 +515,8 @@ def update_user_status(
             )
             db.commit()
             return "User status updated"
-        except SQLAlchemyError:
+        except Exception as e:
+            capture_exception(e)
             raise HTTPException(
                 status_code=500, detail="Error updating user activation status"
             )
@@ -533,7 +545,8 @@ def update_user_subscription_status(
         )
         db.commit()
         return "User subscription status updated"
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=500, detail="Error updating user subscription status"
         )
@@ -553,7 +566,8 @@ def update_user_password(
 
         return "Password changed successfully"
 
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error updating the password",
@@ -616,7 +630,8 @@ def verify_user_email(
 
         return "Thank you! Your email has been verified. You are now all set!"
 
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=500,
             detail="Error updating the email verification status",
@@ -644,7 +659,8 @@ def email_timestamp_refresh(
             db.commit()
 
             return "Email timestamp updated"
-        except SQLAlchemyError:
+        except Exception as e:
+            capture_exception(e)
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail="The email timestamp could not be updated",
@@ -672,7 +688,8 @@ def generate_otp(user: UserOtpBase, db: Session = Depends(get_db)):
             "email": record.email,
             "otp_verification_timestamp": record.otp_verification_timestamp,
         }
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="Error generating the otp"
         )
@@ -706,7 +723,8 @@ def verify_otp(
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST, detail="The otp is incorrect."
             )
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail="The otp entered is either incorrect or has expired",
@@ -725,7 +743,8 @@ def otp_timestamp_refresh(
         db.commit()
 
         return "Otp timestamp updated"
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail="The otp timestamp could not be updated",
@@ -773,7 +792,8 @@ def get_chats_as_seller(
                 .all()
             )
 
-        except SQLAlchemyError:
+        except Exception as e:
+            capture_exception(e)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No seller chat record found",
@@ -824,7 +844,8 @@ def get_chats_as_buyer(
                 .all()
             )
 
-        except SQLAlchemyError:
+        except Exception as e:
+            capture_exception(e)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No buyer chat record found",
@@ -856,7 +877,8 @@ def mark_seller_chat_for_deletion(
             db.commit()
 
             return "Chat marked for deletion"
-        except SQLAlchemyError:
+        except Exception as e:
+            capture_exception(e)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Could not mark record for deletion",
@@ -887,7 +909,8 @@ def mark_buyer_chat_for_deletion(
             db.commit()
 
             return "Chat marked for deletion"
-        except SQLAlchemyError:
+        except Exception as e:
+            capture_exception(e)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Could not mark record for deletion",

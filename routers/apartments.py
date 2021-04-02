@@ -9,8 +9,8 @@ from fastapi import Header
 from fastapi import HTTPException
 from fastapi import status
 from pydantic import BaseModel
+from sentry_sdk import capture_exception
 from sqlalchemy import and_
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from . import get_db
@@ -58,7 +58,8 @@ class ApartmentCreate(ApartmentBase):
 def get_all_apartments(db: Session):
     try:
         return db.query(Apartment).all()
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error encountered while fetching apartments",
@@ -97,7 +98,8 @@ def search_apartment(name: str, db: Session = Depends(get_db)):
             .limit(4)
             .all()
         )
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=500,
             detail="Houston, we have a problem!\nCopy that, we are checking.",
@@ -153,7 +155,8 @@ def add_apartment(
             "verification_hash": new_apartment.verification_hash,
         }
 
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=500,
             detail="Error encountered while adding new apartment",
@@ -202,7 +205,8 @@ def verify_neighbourhood(
         db.commit()
 
         return {"name": record.name, "email": record.submitted_by}
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not verify neighbourhood",
@@ -223,7 +227,8 @@ def get_apartment_from_id(id: int, db: Session = Depends(get_db)):
             return None
 
         return {"name": record.name}
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error fetching apartment",

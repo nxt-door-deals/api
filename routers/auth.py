@@ -14,6 +14,7 @@ from jose import jwt
 from jose import JWTError
 from passlib.hash import pbkdf2_sha256
 from pydantic import BaseModel
+from sentry_sdk import capture_exception
 from sqlalchemy import and_
 from sqlalchemy import cast
 from sqlalchemy import Date
@@ -113,6 +114,7 @@ def get_current_user(
             raise credentials_exception
         token_data = TokenPayload(id=sub)
     except JWTError:
+        capture_exception()
         raise credentials_exception
 
     # Check the count of the current valid ads

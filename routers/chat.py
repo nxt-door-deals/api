@@ -6,8 +6,8 @@ from fastapi import Depends
 from fastapi import HTTPException
 from fastapi import status
 from pydantic import BaseModel
+from sentry_sdk import capture_exception
 from sqlalchemy import and_
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from . import get_db
@@ -80,7 +80,8 @@ def create_chat(chat: ChatBase, db: Session = Depends(get_db)):
         db.commit()
 
         return chat_id
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error creating new chat record",
@@ -97,7 +98,8 @@ def get_chat_history(chat_id: str, db: Session = Depends(get_db)):
 
         if chat_history:
             return chat_history.history or None
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="No chat history"
         )
@@ -113,7 +115,8 @@ def update_notifications(chat_id: str, db: Session = Depends(get_db)):
         )
 
         db.commit()
-    except SQLAlchemyError:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not clear notification status",

@@ -11,6 +11,7 @@ before_install:
 install:
   - pip install pipenv
   - pipenv install
+  - echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDmwXogdW9VG9MwvKbP8vfRdrhusVH62jVkMSR7FdSNa1l4kYsaiDsCvrU2ptV16Zw+nUHsPxrqi0I8te2XWoVeYgizNZIn+0yZ2Bswbdu+iIz09fbPJRlfbB9hpstyh9Fw45Hiavpb6iverTGIppzssJlvISxHafRljID0o+rkRvK0fy08RhAtI7oVPj+xdp3yhTVjBJ2/i2m3iZ8iBa0BdeSw8WE6YdK4VPhQ2aeDsieTZnT9H5qCudrHmjCX2PAPL0vKR46hXn6DU/BoxmDdkNTiUlKeE4QANBo0Y+i3FPrpxI7qXIlFIsjRV4L/LNrJMc90zxYJegAvX36NwwUX abhi_ap@Abhi-Dell' >> $HOME/.ssh/known_hosts
 services:
   - postgresql
 before_script:

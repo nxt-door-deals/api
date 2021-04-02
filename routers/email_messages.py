@@ -9,6 +9,7 @@ from fastapi import status
 from pydantic import BaseModel
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+from sentry_sdk import capture_exception
 from sqlalchemy.orm import Session
 
 from . import get_db
@@ -113,7 +114,8 @@ def send_email(email: EmailSend, background_task: BackgroundTasks):
     try:
         background_task.add_task(send_message, message)
         return status.HTTP_202_ACCEPTED
-    except Exception:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
         )
@@ -130,7 +132,8 @@ def send_email_otp(
     year = email.year or datetime.now().year
     try:
         otp = db.query(User.otp).filter(User.email == email.to_email).first()
-    except Exception:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             detail="There was a problem generating the otp",
@@ -143,7 +146,8 @@ def send_email_otp(
     try:
         background_task.add_task(send_message, message)
         return status.HTTP_202_ACCEPTED
-    except Exception:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
         )
@@ -161,7 +165,8 @@ def send_email_contact(email: EmailSend, background_task: BackgroundTasks):
     try:
         background_task.add_task(send_message, message)
         return "We'll be in touch soon!"
-    except Exception:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
         )
@@ -200,7 +205,8 @@ def send_nbh_registration_email(
     try:
         background_task.add_task(send_message, message)
         return status.HTTP_202_ACCEPTED
-    except Exception:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
         )
@@ -228,7 +234,8 @@ def send_nbh_registration_email_to_user(
     try:
         background_task.add_task(send_message, message)
         return status.HTTP_202_ACCEPTED
-    except Exception:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
         )
@@ -257,7 +264,8 @@ def send_reported_ad_email_to_user(
     try:
         background_task.add_task(send_message, message)
         return status.HTTP_202_ACCEPTED
-    except Exception:
+    except Exception as e:
+        capture_exception(e)
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
         )
