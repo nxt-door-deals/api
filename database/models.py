@@ -38,6 +38,7 @@ class User(Base):
     ads_to_date = Column(Integer, default=0)
     premium_user = Column(Boolean, default=False)
     business_user = Column(Boolean, default=False)
+    number_sold = Column(Integer, default=0)
 
     apartment = relationship("Apartment")
 
