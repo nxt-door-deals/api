@@ -509,7 +509,7 @@ def mark_ad_as_sold(
         capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could nt mark item as sold",
+            detail="Could not mark item as sold",
         )
 
 

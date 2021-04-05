@@ -917,3 +917,33 @@ def mark_buyer_chat_for_deletion(
             )
     else:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+
+# Update the number sold for the user
+@router.put("/update/sold/{user_id}", status_code=status.HTTP_201_CREATED)
+def update_number_sold(
+    user_id: int, db: Session = Depends(get_db), api_key: str = Header(None)
+):
+    if api_key != os.getenv("PROJECT_API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uh uh uh! You didn't say the magic word...",
+        )
+
+    try:
+        existing_number_sold = (
+            db.query(User.number_sold).filter(User.id == user_id).first()
+        )
+
+        new_number_sold = existing_number_sold[0] + 1
+
+        db.query(User).filter(User.id == user_id).update(
+            {User.number_sold: new_number_sold}
+        )
+        db.commit()
+    except Exception as e:
+        capture_exception(e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not update the number sold",
+        )
