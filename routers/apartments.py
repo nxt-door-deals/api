@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from . import get_db
 from . import router
 from database.models import Apartment
+from routers.metrics import metric_counts
 from utils.helpers import address_formatter
 
 
@@ -131,7 +132,7 @@ def add_apartment(
     new_apartment = Apartment(
         name=apartment.name.title().strip(),
         address1=address1_title.strip(),
-        address2=address2_title,
+        address2=address2_title if apartment.address2 else None,
         city=apartment.city.title().strip(),
         state=apartment.state.title(),
         pincode=apartment.pincode,
@@ -142,6 +143,8 @@ def add_apartment(
     try:
         db.add(new_apartment)
         db.commit()
+
+        metric_counts.increment_apartments_registered(db)
 
         return {
             "id": new_apartment.id,
