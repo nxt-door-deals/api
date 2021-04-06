@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import BigInteger
 from sqlalchemy import Boolean
 from sqlalchemy import Column
+from sqlalchemy import Date
 from sqlalchemy import DateTime
 from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
@@ -168,3 +169,20 @@ class ReportedAd(Base):
 
     def __repr__(self):
         return f"ReportedAd({self.ad_id}, {self.reported_by}, {self.reason})"
+
+
+class Metric(Base):
+
+    __tablename__ = "metrics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, nullable=False)
+    registered_users = Column(Integer, default=0)
+    deleted_user_accounts = Column(Integer, default=0)
+    ads_posted = Column(Integer, default=0)
+    items_sold = Column(Integer, default=0)
+    ads_reported = Column(Integer, default=0)
+    apartments_registered = Column(Integer, default=0)
+
+    def __repr__(self):
+        return f"Metric({self.id}, {self.date})"

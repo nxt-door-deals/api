@@ -36,6 +36,7 @@ from database.models import Apartment
 from database.models import Chat
 from database.models import ReportedAd
 from database.models import User
+from routers.metrics import metric_counts
 from utils.helpers import generate_id_from_token
 from utils.helpers import get_posted_days
 from utils.helpers import initialize_s3
@@ -421,10 +422,12 @@ def create_ad(
         db.add(new_ad)
         db.commit()
 
-        increment_user_ad_count(posted_by, db)
-
         if images:
             upload_files_to_s3(new_ad.id, new_ad.posted_by, images, db)
+
+        increment_user_ad_count(posted_by, db)
+        metric_counts.increment_posted_ad_counts(db)
+
         return {
             "title": title,
             "description": description,
@@ -803,6 +806,8 @@ def report_ad(
         try:
             db.add(new_report)
             db.commit()
+
+            metric_counts.increment_ads_reported(db)
 
             return {"msg": f"Ad {ad.ad_id} reported"}
 

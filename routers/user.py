@@ -29,7 +29,9 @@ from database.models import AdImage
 from database.models import Chat
 from database.models import ChatHistory
 from database.models import LikedAd
+from database.models import ReportedAd
 from database.models import User
+from routers.metrics import metric_counts
 from utils.helpers import generate_id_from_token
 from utils.helpers import initialize_s3
 
@@ -225,6 +227,10 @@ def delete_user_ads(user_id: int, ads: List, db: Session):
             synchronize_session="fetch"
         )
 
+        db.query(ReportedAd).filter(ReportedAd.reported_by == user_id).delete(
+            synchronize_session="fetch"
+        )
+
         db.commit()
     except Exception as e:
         capture_exception(e)
@@ -376,6 +382,9 @@ def register_user(
         )
 
         db.commit()
+
+        metric_counts.increment_registered_users(db)
+
     except Exception as e:
         capture_exception(e)
         raise HTTPException(
@@ -409,13 +418,13 @@ def delete_user(
         )
 
     if generate_id_from_token(authorization, user_id):
-
         try:
+            metric_counts.increment_deleted_user_accounts(db)
             background_task.add_task(delete_s3_user_folder, user_id)
 
             ads = get_user_ads(user_id, db)
-
             background_task.add_task(delete_user_records, user_id, ads, db)
+
         except Exception as e:
             capture_exception(e)
             raise HTTPException(
@@ -941,6 +950,8 @@ def update_number_sold(
             {User.number_sold: new_number_sold}
         )
         db.commit()
+
+        metric_counts.increment_items_sold(db)
     except Exception as e:
         capture_exception(e)
         raise HTTPException(
