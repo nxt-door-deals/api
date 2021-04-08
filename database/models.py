@@ -40,6 +40,7 @@ class User(Base):
     premium_user = Column(Boolean, default=False)
     business_user = Column(Boolean, default=False)
     number_sold = Column(Integer, default=0)
+    invalid_login_count = Column(Integer, default=0)
 
     apartment = relationship("Apartment")
 

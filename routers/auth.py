@@ -57,18 +57,52 @@ def verify_password(plain_password: str, password_hash: str):
     return pbkdf2_sha256.verify(plain_password, password_hash)
 
 
-def authenticate_user(db: Session, email: str, password: str):
+def find_user_by_email(email: str, db: Session = Depends(get_db)):
+    return db.query(User).filter(User.email == email).first()
+
+
+def authenticate_user(email: str, password: str, db: Session = Depends(get_db)):
     email = email.lower()
-    user = db.query(User).filter(User.email == email).first()
+    user = find_user_by_email(email, db)
+
     if not user:
         raise HTTPException(
             status_code=401, detail="Sorry! We cannot find that email address"
         )
     if not verify_password(password, user.hashed_password):
+        update_invalid_login_counts(email, db)
         raise HTTPException(
             status_code=401, detail="Sorry! That password is incorrect"
         )
     return user
+
+
+def update_invalid_login_counts(email: str, db: Session = Depends(get_db)):
+
+    try:
+        current_count = (
+            db.query(User.invalid_login_count).filter(User.email == email).one()
+        )
+
+        db.query(User).filter(User.email == email).update(
+            {User.invalid_login_count: current_count[0] + 1}
+        )
+
+        db.commit()
+    except Exception as e:
+        capture_exception(e)
+
+
+def reset_invalid_login_counts(email: str, db: Session = Depends(get_db)):
+
+    try:
+        db.query(User).filter(User.email == email).update(
+            {User.invalid_login_count: 0}
+        )
+
+        db.commit()
+    except Exception as e:
+        capture_exception(e)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -216,22 +250,39 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    user = authenticate_user(form_data.username, form_data.password, db)
+    # if not user:
+    #     update_invalid_login_counts(form_data.username, db)
+    #     raise HTTPException(
+    #         status_code=401,
+    #         detail="Incorrect email or password",
+    #         headers={"WWW-Authenticate": "Bearer"},
+    #     )
     id = str(user.id)
-    access_token_expires = timedelta(
-        minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
-    )
-    access_token = create_access_token(
-        data={"sub": id}, expires_delta=access_token_expires
+    # access_token_expires = timedelta(
+    #     minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+    # )
+    access_token = create_access_token(data={"sub": id})
+    reset_invalid_login_counts(form_data.username, db)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.get("/counts", status_code=status.HTTP_200_OK)
+def get_login_counts(email: str, db: Session = Depends(get_db)):
+
+    user = find_user_by_email(email, db)
+
+    if not user:
+        print(user)
+        raise HTTPException(
+            status_code=401, detail="Sorry! We cannot find that email address"
+        )
+
+    count = (
+        db.query(User.invalid_login_count).filter(User.email == email).first()
     )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    return count[0]
 
 
 @router.get("/auth/current_user", status_code=status.HTTP_200_OK)
