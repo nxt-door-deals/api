@@ -32,6 +32,7 @@ better-profanity = "*"
 websockets = "*"
 python-multipart = "*"
 sentry-sdk = "*"
+contentful = "*"
 
 [requires]
 python_version = "3.7"
