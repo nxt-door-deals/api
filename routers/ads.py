@@ -8,6 +8,7 @@ from decimal import Decimal
 from math import trunc
 from typing import List
 from typing import Optional
+from uuid import UUID
 
 from babel.numbers import format_decimal
 from fastapi import Depends
@@ -63,7 +64,7 @@ class AdsBase(BaseModel):
 
 
 class ReportAd(BaseModel):
-    ad_id: int
+    ad_id: UUID
     reported_by: int
     reason: str
     description: str
@@ -97,7 +98,7 @@ def fix_image_orientation(optimized_image):
 
 
 def upload_files_to_s3(
-    ad_id: int, user_id: int, uploadedImages: List, db: Session
+    ad_id: UUID, user_id: int, uploadedImages: List, db: Session
 ):
     s3_resource = initialize_s3()
 
@@ -131,15 +132,15 @@ def upload_files_to_s3(
         s3_resource.Bucket(os.getenv("AWS_STORAGE_BUCKET_NAME")).put_object(
             ACL="public-read",
             Body=in_mem_file,
-            Key=f"users/{user_id}/ads/{ad_id}/{file_name}{file_ext}",
+            Key=f"users/{user_id}/ads/{str(ad_id)}/{file_name}{file_ext}",
         )
 
         url_prefix = f"https://{os.getenv('AWS_STORAGE_BUCKET_NAME')}.s3.{os.getenv('AWS_DEFAULT_REGION')}.amazonaws.com"
 
         # Make an entry in the database
         new_ad = AdImage(
-            ad_id=ad_id,
-            image_path=f"{url_prefix}/users/{user_id}/ads/{ad_id}/{file_name}{file_ext}",
+            ad_id=str(ad_id),
+            image_path=f"{url_prefix}/users/{user_id}/ads/{str(ad_id)}/{file_name}{file_ext}",
         )
         db.add(new_ad)
     try:
@@ -155,8 +156,10 @@ def upload_files_to_s3(
         )
 
 
-def get_images_from_s3(ad_id: int, db: Session):
-    return db.query(AdImage.image_path).filter(AdImage.ad_id == ad_id).all()
+def get_images_from_s3(ad_id: UUID, db: Session):
+    return (
+        db.query(AdImage.image_path).filter(AdImage.ad_id == str(ad_id)).all()
+    )
 
 
 def format_price(amount):
@@ -168,11 +171,11 @@ def format_price(amount):
     return format_decimal(trunc(amount), locale="en_IN")
 
 
-def check_for_chat_record(ad_id: int, user_id: int, db: Session):
+def check_for_chat_record(ad_id: UUID, user_id: int, db: Session):
 
     chat_record = (
         db.query(Chat)
-        .filter(and_(Chat.ad_id == ad_id, Chat.seller_id == user_id))
+        .filter(and_(Chat.ad_id == str(ad_id), Chat.seller_id == user_id))
         .all()
     )
 
@@ -218,7 +221,7 @@ def get_ads(records: List, db: Session):
 
 
 # Delete individual images from the edit ad page
-def delete_individual_image(user_id: int, ad_id: int, image: str):
+def delete_individual_image(user_id: int, ad_id: UUID, image: str):
     s3_resource = initialize_s3()
 
     bucket = s3_resource.Bucket(os.getenv("AWS_STORAGE_BUCKET_NAME"))
@@ -240,10 +243,10 @@ def delete_individual_image(user_id: int, ad_id: int, image: str):
         return "Image not deleted"
 
 
-def reported_ad_check(ad_id: int, db: Session = Depends(get_db)):
+def reported_ad_check(ad_id: UUID, db: Session = Depends(get_db)):
     return (
         db.query(ReportedAd.ad_id)
-        .filter(ReportedAd.ad_id == ad_id)
+        .filter(ReportedAd.ad_id == str(ad_id))
         .group_by(ReportedAd.ad_id)
         .having(func.count(ReportedAd.ad_id) >= 5)
         .all()
@@ -304,7 +307,7 @@ def get_all_ads(db: Session = Depends(get_db)):
 
 # Fetch ad from ad id - returning None will redirect to 404.js
 @router.get("/ads/{id}", status_code=status.HTTP_200_OK)
-def get_ad_details_from_id(id: int, db: Session = Depends(get_db)):
+def get_ad_details_from_id(id: UUID, db: Session = Depends(get_db)):
 
     ad = {}
 
@@ -313,7 +316,9 @@ def get_ad_details_from_id(id: int, db: Session = Depends(get_db)):
 
     try:
         ad_record = (
-            db.query(Ad).filter(Ad.id == id, Ad.active == True).first()  # noqa
+            db.query(Ad)
+            .filter(Ad.id == str(id), Ad.active == True)  # noqa
+            .first()
         )
 
         if not ad_record:
@@ -349,7 +354,11 @@ def get_ad_details_from_id(id: int, db: Session = Depends(get_db)):
             else ad_record.available_from
         )
 
-        modified_id = ad_record.ad_category[0] + "AD" + str(ad_record.id)
+        modified_id = (
+            ad_record.ad_category[0]
+            + "AD"
+            + (str(ad_record.id).split("-")[0][:5].upper())
+        )
 
         ad["id"] = ad_record.id
         ad["modified_id"] = modified_id
@@ -452,7 +461,7 @@ def create_ad(
 # Update an ad
 @router.put("/ads/update", status_code=status.HTTP_201_CREATED)
 def update_ad(
-    ad_id: int,
+    ad_id: UUID,
     posted_by_id: int,
     title: str = Form(...),
     description: str = Form(...),
@@ -468,7 +477,7 @@ def update_ad(
     # Convert the string "available_from" to datetime
     available_from = datetime.strptime(available_from, "%Y-%m-%d %H:%M:%S")
     try:
-        db.query(Ad).filter(Ad.id == ad_id).update(
+        db.query(Ad).filter(Ad.id == str(ad_id)).update(
             {
                 Ad.title: title,
                 Ad.description: description,
@@ -497,7 +506,7 @@ def update_ad(
 # Mark item as sold
 @router.put("/ad/sold/{ad_id}", status_code=status.HTTP_201_CREATED)
 def mark_ad_as_sold(
-    ad_id: int, db: Session = Depends(get_db), api_key: str = Header(None)
+    ad_id: UUID, db: Session = Depends(get_db), api_key: str = Header(None)
 ):
     if api_key != os.getenv("PROJECT_API_KEY"):
         raise HTTPException(
@@ -506,7 +515,7 @@ def mark_ad_as_sold(
         )
 
     try:
-        db.query(Ad).filter(Ad.id == ad_id).update({Ad.sold: True})
+        db.query(Ad).filter(Ad.id == str(ad_id)).update({Ad.sold: True})
         db.commit()
     except Exception as e:
         capture_exception(e)
@@ -724,7 +733,7 @@ def sort_by_giveaway_desc(nbh_id: int, db: Session = Depends(get_db)):
 @router.delete("/image/delete", status_code=status.HTTP_202_ACCEPTED)
 def delete_image(
     user_id: int,
-    ad_id: int,
+    ad_id: UUID,
     image: str,
     db: Session = Depends(get_db),
     authorization: str = Header(None),
@@ -757,7 +766,7 @@ def delete_image(
 
 @router.get("/reported/{ad_id}", status_code=status.HTTP_200_OK)
 def get_reported_ads(
-    ad_id: int, db: Session = Depends(get_db), api_key: str = Header(None)
+    ad_id: UUID, db: Session = Depends(get_db), api_key: str = Header(None)
 ):
     if api_key != os.getenv("PROJECT_API_KEY"):
         raise HTTPException(
@@ -767,7 +776,7 @@ def get_reported_ads(
 
     try:
         reported_ad_records = (
-            db.query(ReportedAd).filter(ReportedAd.ad_id == ad_id).all()
+            db.query(ReportedAd).filter(ReportedAd.ad_id == str(ad_id)).all()
         )
 
         return {
@@ -797,7 +806,7 @@ def report_ad(
     if generate_id_from_token(authorization, ad.reported_by):
 
         new_report = ReportedAd(
-            ad_id=ad.ad_id,
+            ad_id=str(ad.ad_id),
             reported_by=ad.reported_by,
             reason=ad.reason,
             description=ad.description,

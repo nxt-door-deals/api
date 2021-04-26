@@ -6,6 +6,7 @@ from datetime import datetime
 from datetime import timedelta
 from typing import List
 from typing import Optional
+from uuid import UUID
 
 import pytz
 from fastapi import BackgroundTasks
@@ -181,7 +182,7 @@ def delete_s3_user_folder(user_id: int):
         )
 
 
-def delete_s3_ad_folders(user_id: int, ad_id: int):
+def delete_s3_ad_folders(user_id: int, ad_id: UUID):
     s3_resource = initialize_s3()
 
     bucket = s3_resource.Bucket(os.getenv("AWS_STORAGE_BUCKET_NAME"))
@@ -219,7 +220,7 @@ def delete_user_ads(user_id: int, ads: List, db: Session):
         )
 
         for ad in ads:
-            db.query(AdImage).filter(AdImage.ad_id == ad[0]).delete(
+            db.query(AdImage).filter(AdImage.ad_id == str(ad[0])).delete(
                 synchronize_session="fetch"
             )
 
@@ -240,17 +241,17 @@ def delete_user_ads(user_id: int, ads: List, db: Session):
         )
 
 
-def delete_selected_ad(ad_id: int, db: Session):
+def delete_selected_ad(ad_id: UUID, db: Session):
     try:
-        db.query(LikedAd).filter(LikedAd.ad_id == ad_id).delete(
+        db.query(LikedAd).filter(LikedAd.ad_id == str(ad_id)).delete(
             synchronize_session="fetch"
         )
 
-        db.query(AdImage).filter(AdImage.ad_id == ad_id).delete(
+        db.query(AdImage).filter(AdImage.ad_id == str(ad_id)).delete(
             synchronize_session="fetch"
         )
 
-        db.query(Ad).filter(Ad.id == ad_id).update({Ad.active: False})
+        db.query(Ad).filter(Ad.id == str(ad_id)).update({Ad.active: False})
 
         db.commit()
     except Exception as e:
@@ -438,7 +439,7 @@ def delete_user(
 @router.delete("/userads/delete/", status_code=status.HTTP_202_ACCEPTED)
 def delete_user_ad(
     user_id: int,
-    ad_id: int,
+    ad_id: UUID,
     db: Session = Depends(get_db),
     authorization: str = Header(None),
 ):

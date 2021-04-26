@@ -1,6 +1,7 @@
 import hashlib
 import secrets
 from typing import Optional
+from uuid import UUID
 
 from fastapi import Depends
 from fastapi import HTTPException
@@ -17,7 +18,7 @@ from database.models import ChatHistory
 
 
 class ChatBase(BaseModel):
-    ad_id: int
+    ad_id: UUID
     seller_id: int
     buyer_id: Optional[int]
 
@@ -28,14 +29,14 @@ class ChatMessage(BaseModel):
 
 
 def get_chat_record(
-    ad_id: int, seller_id: int, buyer_id: int, db: Session = Depends(get_db)
+    ad_id: UUID, seller_id: int, buyer_id: int, db: Session = Depends(get_db)
 ):
 
     chat_id = (
         db.query(Chat.chat_id)
         .filter(
             and_(
-                Chat.ad_id == ad_id,
+                Chat.ad_id == str(ad_id),
                 Chat.seller_id == seller_id,
                 Chat.buyer_id == buyer_id,
             )
@@ -51,7 +52,7 @@ def get_chat_record(
 
 @router.get("/chat")
 def get_chat_details(
-    ad_id: int, seller_id: int, buyer_id: int, db: Session = Depends(get_db)
+    ad_id: UUID, seller_id: int, buyer_id: int, db: Session = Depends(get_db)
 ):
     chat_id = get_chat_record(ad_id, seller_id, buyer_id, db)
 
@@ -66,7 +67,7 @@ def create_chat(chat: ChatBase, db: Session = Depends(get_db)):
     chat_id = hashlib.sha256(secrets.token_hex(64).encode()).hexdigest()
 
     new_chat = Chat(
-        ad_id=chat.ad_id,
+        ad_id=str(chat.ad_id),
         seller_id=chat.seller_id,
         buyer_id=chat.buyer_id,
         chat_id=chat_id,

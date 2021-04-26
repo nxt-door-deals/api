@@ -33,6 +33,7 @@ websockets = "*"
 python-multipart = "*"
 sentry-sdk = "*"
 contentful = "*"
+sse-starlette = "*"
 
 [requires]
 python_version = "3.7"
