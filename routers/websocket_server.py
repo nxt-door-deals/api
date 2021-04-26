@@ -1,13 +1,19 @@
+import asyncio
 import json
+from datetime import datetime
 from typing import Dict
 from typing import List
 
 from better_profanity import profanity
 from fastapi import Depends
+from fastapi import Request
+from fastapi import status
 from fastapi import WebSocket
 from fastapi import WebSocketDisconnect
 from sentry_sdk import capture_exception
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
+from sse_starlette.sse import EventSourceResponse
 
 from . import get_db
 from . import router
@@ -115,10 +121,13 @@ def save_chat_message(data: str, chat_id: str, db: Session):
 
         message_list.append(message_json)
 
+        last_message = datetime.now()
+
         db.query(ChatHistory).filter(ChatHistory.chat_id == chat_id).update(
             {
                 ChatHistory.history: message_list,
                 ChatHistory.new_notifications: True,
+                ChatHistory.last_chat_message: last_message,
             }
         )
 
@@ -130,6 +139,34 @@ def save_chat_message(data: str, chat_id: str, db: Session):
         db.commit()
     except Exception as e:
         capture_exception(e)
+
+
+async def check_for_new_notifications(
+    user_id: int, request: Request, db: Session = Depends(get_db)
+):
+    chat_ids = (
+        db.query(ChatHistory)
+        .join(Chat)
+        .filter(
+            Chat.chat_id == ChatHistory.chat_id,
+            or_(Chat.seller_id == user_id, Chat.buyer_id == user_id),
+            ChatHistory.new_notifications == True,  # noqa,
+        )
+        .all()
+    )
+
+    if chat_ids:
+        for chat in chat_ids:
+            if await request.is_disconnected():
+                break
+
+            if (
+                chat.history[-1]["sender"] != user_id
+                and ((datetime.now() - chat.last_chat_message).total_seconds())
+                < 60
+            ):
+                yield {"data": chat.chat_id}
+            await asyncio.sleep(40)  # Run every 40 seconds
 
 
 # End points
@@ -161,3 +198,11 @@ async def default_websocket(
             manager.disconnect(websocket, chat_id)
     else:
         await handle_rejected_connections(websocket)
+
+
+@router.get("/new/chats", status_code=status.HTTP_200_OK)
+async def new_chats(
+    user_id: int, request: Request, db: Session = Depends(get_db)
+):
+    event_generator = check_for_new_notifications(user_id, request, db)
+    return EventSourceResponse(event_generator)

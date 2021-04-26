@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 from sqlalchemy import BigInteger
@@ -10,6 +11,7 @@ from sqlalchemy import Integer
 from sqlalchemy import Numeric
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import relationship
 
@@ -72,7 +74,10 @@ class Apartment(Base):
 class Ad(Base):
     __tablename__ = "ads"
 
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    # id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    id = Column(
+        UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4
+    )
     title = Column(String(100), nullable=False)
     description = Column(String(10000), nullable=False)
     ad_category = Column(String(50), nullable=False, index=True)
@@ -99,7 +104,7 @@ class AdImage(Base):
     __tablename__ = "adimages"
 
     id = Column(BigInteger, primary_key=True, nullable=False, index=True)
-    ad_id = Column(Integer, ForeignKey("ads.id"))
+    ad_id = Column(UUID, ForeignKey("ads.id"))
     image_path = Column(String(500), nullable=False)
 
     image = relationship("Ad")
@@ -112,7 +117,7 @@ class LikedAd(Base):
     __tablename__ = "likedads"
 
     id = Column(BigInteger, primary_key=True, nullable=False, index=True)
-    ad_id = Column(Integer, ForeignKey("ads.id"))
+    ad_id = Column(UUID, ForeignKey("ads.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
 
     ad = relationship("Ad")
@@ -126,7 +131,7 @@ class Chat(Base):
     __tablename__ = "chats"
 
     id = Column(BigInteger, primary_key=True, nullable=False, index=True)
-    ad_id = Column(Integer, ForeignKey("ads.id"))
+    ad_id = Column(UUID, ForeignKey("ads.id"))
     seller_id = Column(Integer)
     buyer_id = Column(Integer)
     chat_id = Column(String(64), unique=True, nullable=False)
@@ -148,6 +153,7 @@ class ChatHistory(Base):
     chat_id = Column(String(64), ForeignKey("chats.chat_id"), nullable=False)
     history = Column(MutableList.as_mutable(JSONB))
     new_notifications = Column(Boolean, default=False)
+    last_chat_message = Column(DateTime, default=datetime.now)
 
     chat = relationship("Chat")
 
@@ -159,7 +165,7 @@ class ReportedAd(Base):
     __tablename__ = "reportedads"
 
     id = Column(Integer, primary_key=True, index=True)
-    ad_id = Column(Integer, ForeignKey("ads.id"), index=True)
+    ad_id = Column(UUID, ForeignKey("ads.id"), index=True)
     reported_by = Column(Integer, ForeignKey("users.id"), index=True)
     reason = Column(String(100), nullable=False)
     description = Column(String(5000), nullable=False)

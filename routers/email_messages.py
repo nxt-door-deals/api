@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from fastapi import BackgroundTasks
 from fastapi import Depends
@@ -74,7 +75,7 @@ class NbhEmailSendUser(EmailSend):
 class ReportedAdEmail(EmailSend):
     description: Optional[str]
     ad_title: str
-    ad_id: Optional[int]
+    ad_id: Optional[UUID]
 
     class Config:
         schema_extra = {
@@ -255,7 +256,7 @@ def send_reported_ad_email_to_user(
     message.dynamic_template_data = {
         "description": email.description,
         "ad_title": email.ad_title,
-        "ad_id": email.ad_id,
+        "ad_id": str(email.ad_id),
         "year": email.year or datetime.now().year,
     }
 
