@@ -357,12 +357,7 @@ def register_user(
         db.commit()
 
         id = str(new_user.id)
-        token = create_access_token(
-            data={
-                "sub": id,
-                "expires_delta": int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")),
-            }
-        )
+        token = create_access_token(data={"sub": id})
 
         create_user_folders_in_s3(new_user.id)
 
