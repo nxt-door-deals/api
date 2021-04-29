@@ -273,7 +273,6 @@ def get_login_counts(email: str, db: Session = Depends(get_db)):
     user = find_user_by_email(email, db)
 
     if not user:
-        print(user)
         raise HTTPException(
             status_code=401, detail="Sorry! We cannot find that email address"
         )

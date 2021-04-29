@@ -766,9 +766,11 @@ def delete_image(
 
 @router.get("/reported/{ad_id}", status_code=status.HTTP_200_OK)
 def get_reported_ads(
-    ad_id: UUID, db: Session = Depends(get_db), api_key: str = Header(None)
+    ad_id: UUID,
+    db: Session = Depends(get_db),
+    authorization: str = Header(None),
 ):
-    if api_key != os.getenv("PROJECT_API_KEY"):
+    if "Bearer" not in authorization:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uh uh uh! You didn't say the magic word...",
