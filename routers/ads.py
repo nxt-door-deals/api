@@ -10,6 +10,7 @@ from typing import List
 from typing import Optional
 from uuid import UUID
 
+import tinify
 from babel.numbers import format_decimal
 from fastapi import Depends
 from fastapi import File
@@ -55,7 +56,7 @@ class AdsBase(BaseModel):
     condition: str
     available_from: Optional[datetime] = datetime.today().date()
     publish_flat_number: Optional[bool] = False
-    posted_by: int
+    posted_by: UUID
     apartment_id: int
     images: List[UploadFile] = File(...)
 
@@ -98,11 +99,14 @@ def fix_image_orientation(optimized_image):
 
 
 def upload_files_to_s3(
-    ad_id: UUID, user_id: int, uploadedImages: List, db: Session
+    ad_id: UUID, user_id: str, uploadedImages: List, db: Session
 ):
+    tinify.key = "yg9wF69VzSBYGhBwt61dKs7RkgmJJwV2"
+    tinify.validate()
+
     s3_resource = initialize_s3()
 
-    image_size = (800, 600)
+    # image_size = (800, 600)
 
     for image in uploadedImages:
         file_name, file_ext = os.path.splitext(image.filename)
@@ -114,28 +118,39 @@ def upload_files_to_s3(
 
         optimized_image = fix_image_orientation(optimized_image)
 
-        if (
-            optimized_image.width < image_size[0]
-            or optimized_image.height < image_size[1]
-        ):
-            image_size = (optimized_image.width, optimized_image.height)
+        # if (
+        #     optimized_image.width < image_size[0]
+        #     or optimized_image.height < image_size[1]
+        # ):
+        image_size = (
+            int(optimized_image.width / 1.5),
+            int(optimized_image.height / 1.5),
+        )
 
         optimized_image = optimized_image.resize(image_size)
 
         in_mem_file = io.BytesIO()
-        optimized_image.save(in_mem_file, format=file_ext[1:], optimized=True)
+        optimized_image.save(
+            in_mem_file, format="jpeg", optimized=True, quality=70
+        )
         in_mem_file.seek(0)
 
         file_name = uuid.uuid4()
 
+        with in_mem_file as source:
+            source_data = source.read()
+            result_data = tinify.from_buffer(source_data).to_buffer()
+
         # Add image to the bucket
         s3_resource.Bucket(os.getenv("AWS_STORAGE_BUCKET_NAME")).put_object(
             ACL="public-read",
-            Body=in_mem_file,
+            Body=io.BytesIO(result_data),
             Key=f"users/{user_id}/ads/{str(ad_id)}/{file_name}{file_ext}",
         )
 
-        url_prefix = f"https://{os.getenv('AWS_STORAGE_BUCKET_NAME')}.s3.{os.getenv('AWS_DEFAULT_REGION')}.amazonaws.com"
+        # url_prefix = f"https://{os.getenv('AWS_STORAGE_BUCKET_NAME')}.s3.{os.getenv('AWS_DEFAULT_REGION')}.amazonaws.com"
+
+        url_prefix = os.getenv("IMAGEKIT_URL_PREFIX")
 
         # Make an entry in the database
         new_ad = AdImage(
@@ -171,7 +186,7 @@ def format_price(amount):
     return format_decimal(trunc(amount), locale="en_IN")
 
 
-def check_for_chat_record(ad_id: UUID, user_id: int, db: Session):
+def check_for_chat_record(ad_id: UUID, user_id: str, db: Session):
 
     chat_record = (
         db.query(Chat)
@@ -221,7 +236,7 @@ def get_ads(records: List, db: Session):
 
 
 # Delete individual images from the edit ad page
-def delete_individual_image(user_id: int, ad_id: UUID, image: str):
+def delete_individual_image(user_id: str, ad_id: UUID, image: str):
     s3_resource = initialize_s3()
 
     bucket = s3_resource.Bucket(os.getenv("AWS_STORAGE_BUCKET_NAME"))
@@ -272,7 +287,7 @@ def list_all_ads(db: Session = Depends(get_db)):
         )
 
 
-def increment_user_ad_count(user_id: int, db: Session = Depends(get_db)):
+def increment_user_ad_count(user_id: str, db: Session = Depends(get_db)):
     try:
         # Get current ad count for the user
         current_ad_count = (
@@ -406,11 +421,17 @@ def create_ad(
     condition: str = Form(...),
     available_from: str = Form(...),
     publish_flat_number: bool = Form(...),
-    posted_by: int = Form(...),
+    posted_by: str = Form(...),
     apartment_id: int = Form(...),
     images: Optional[List[UploadFile]] = Form([]),
     db: Session = Depends(get_db),
+    authorization: str = Header(None),
 ):
+    if not generate_id_from_token(authorization, posted_by):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Session Expired"
+        )
+
     # Convert the string "available_from" to datetime
     available_from = datetime.strptime(available_from, "%Y-%m-%d %H:%M:%S")
 
@@ -462,7 +483,7 @@ def create_ad(
 @router.put("/ads/update", status_code=status.HTTP_201_CREATED)
 def update_ad(
     ad_id: UUID,
-    posted_by_id: int,
+    posted_by_id: UUID,
     title: str = Form(...),
     description: str = Form(...),
     ad_type: str = Form(...),
@@ -473,7 +494,14 @@ def update_ad(
     publish_flat_number: bool = Form(...),
     images: Optional[List[UploadFile]] = Form([]),
     db: Session = Depends(get_db),
+    authorization: str = Header(None),
 ):
+
+    if not generate_id_from_token(authorization, posted_by_id):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Session Expired"
+        )
+
     # Convert the string "available_from" to datetime
     available_from = datetime.strptime(available_from, "%Y-%m-%d %H:%M:%S")
     try:
@@ -504,25 +532,22 @@ def update_ad(
 
 
 # Mark item as sold
-@router.put("/ad/sold/{ad_id}", status_code=status.HTTP_201_CREATED)
-def mark_ad_as_sold(
-    ad_id: UUID, db: Session = Depends(get_db), api_key: str = Header(None)
-):
-    if api_key != os.getenv("PROJECT_API_KEY"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uh uh uh! You didn't say the magic word...",
-        )
+# @router.put("/ad/sold/{ad_id}", status_code=status.HTTP_201_CREATED)
+# def mark_ad_as_sold(
+#     ad_id: UUID,
+#     db: Session = Depends(get_db),
+#     authorization: str = Header(None),
+# ):
 
-    try:
-        db.query(Ad).filter(Ad.id == str(ad_id)).update({Ad.sold: True})
-        db.commit()
-    except Exception as e:
-        capture_exception(e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not mark item as sold",
-        )
+#     try:
+#         db.query(Ad).filter(Ad.id == str(ad_id)).update({Ad.sold: True})
+#         db.commit()
+#     except Exception as e:
+#         capture_exception(e)
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail="Could not mark item as sold",
+#         )
 
 
 # Get ads for a particular neighbourhood
@@ -543,7 +568,17 @@ def get_ads_for_neighbourhood(nbh_id: int, db: Session = Depends(get_db)):
 
 # Get ads for a particular user
 @router.get("/userads/get/{user_id}", status_code=status.HTTP_200_OK)
-def get_ads_for_user(user_id: int, db: Session = Depends(get_db)):
+def get_ads_for_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    authorization: str = Header(None),
+):
+
+    if not generate_id_from_token(authorization, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Session Expired"
+        )
+
     try:
         records = (
             db.query(Ad)
@@ -732,50 +767,37 @@ def sort_by_giveaway_desc(nbh_id: int, db: Session = Depends(get_db)):
 
 @router.delete("/image/delete", status_code=status.HTTP_202_ACCEPTED)
 def delete_image(
-    user_id: int,
+    user_id: str,
     ad_id: UUID,
     image: str,
     db: Session = Depends(get_db),
     authorization: str = Header(None),
 ):
-    if "Bearer" not in authorization:
+
+    if not generate_id_from_token(authorization, user_id):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uh uh uh! You didn't say the magic word...",
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Session Expired"
         )
 
-    if generate_id_from_token(authorization, user_id):
-        try:
-            db.query(AdImage).filter(
-                AdImage.image_path.ilike("%" + image + "%")
-            ).delete(synchronize_session="fetch")
+    try:
+        db.query(AdImage).filter(
+            AdImage.image_path.ilike("%" + image + "%")
+        ).delete(synchronize_session="fetch")
 
-            db.commit()
+        db.commit()
 
-            delete_individual_image(user_id, ad_id, image)
-            return "Image deleted"
-        except Exception as e:
-            capture_exception(e)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Image could not be deleted",
-            )
-    else:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        delete_individual_image(user_id, ad_id, image)
+        return "Image deleted"
+    except Exception as e:
+        capture_exception(e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Image could not be deleted",
+        )
 
 
 @router.get("/reported/{ad_id}", status_code=status.HTTP_200_OK)
-def get_reported_ads(
-    ad_id: UUID,
-    db: Session = Depends(get_db),
-    authorization: str = Header(None),
-):
-    if "Bearer" not in authorization:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uh uh uh! You didn't say the magic word...",
-        )
-
+def get_reported_ads(ad_id: UUID, db: Session = Depends(get_db)):
     try:
         reported_ad_records = (
             db.query(ReportedAd).filter(ReportedAd.ad_id == str(ad_id)).all()
@@ -799,34 +821,29 @@ def report_ad(
     db: Session = Depends(get_db),
     authorization: str = Header(None),
 ):
-    if "Bearer" not in authorization:
+    if not generate_id_from_token(authorization, ad.reported_by):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uh uh uh! You didn't say the magic word...",
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Session Expired"
         )
 
-    if generate_id_from_token(authorization, ad.reported_by):
+    new_report = ReportedAd(
+        ad_id=str(ad.ad_id),
+        reported_by=ad.reported_by,
+        reason=ad.reason,
+        description=ad.description,
+    )
 
-        new_report = ReportedAd(
-            ad_id=str(ad.ad_id),
-            reported_by=ad.reported_by,
-            reason=ad.reason,
-            description=ad.description,
+    try:
+        db.add(new_report)
+        db.commit()
+
+        metric_counts.increment_ads_reported(db)
+
+        return {"msg": f"Ad {ad.ad_id} reported"}
+
+    except Exception as e:
+        capture_exception(e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not report ad",
         )
-
-        try:
-            db.add(new_report)
-            db.commit()
-
-            metric_counts.increment_ads_reported(db)
-
-            return {"msg": f"Ad {ad.ad_id} reported"}
-
-        except Exception as e:
-            capture_exception(e)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Could not report ad",
-            )
-    else:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)

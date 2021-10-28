@@ -21,7 +21,9 @@ from database.db import Base
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    id = Column(
+        UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4
+    )
     name = Column(String(100), nullable=False)
     email = Column(String(50), unique=True, nullable=False, index=True)
     mobile = Column(String(15))
@@ -33,9 +35,15 @@ class User(Base):
     created_on = Column(DateTime, default=datetime.now)
     otp = Column(String(6))
     otp_verification_timestamp = Column(DateTime)
+    invalid_otp_count = Column(Integer, default=0)
+    otp_generated_count = Column(Integer, default=0)
+    otp_locked_timestamp = Column(DateTime)
+    lock_otp_send = Column(Boolean, default=False)
     email_verified = Column(Boolean, default=False)
     email_verification_hash = Column(String(100))
     email_verification_timestamp = Column(DateTime)
+    verification_email_sent_count = Column(Integer, default=0)
+    verification_email_sent_timestamp = Column(DateTime, default=datetime.now)
     profile_path = Column(String(500))
     ads_path = Column(String(500))
     ads_to_date = Column(Integer, default=0)
@@ -89,7 +97,7 @@ class Ad(Base):
     publish_flat_number = Column(Boolean, default=False)
     active = Column(Boolean, default=True)
     sold = Column(Boolean, default=False)
-    posted_by = Column(Integer, ForeignKey("users.id"))
+    posted_by = Column(UUID, ForeignKey("users.id"))
     apartment_id = Column(Integer, ForeignKey("apartments.id"))
     created_on = Column(DateTime, default=datetime.now)
 
@@ -118,7 +126,7 @@ class LikedAd(Base):
 
     id = Column(BigInteger, primary_key=True, nullable=False, index=True)
     ad_id = Column(UUID, ForeignKey("ads.id"))
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(UUID, ForeignKey("users.id"))
 
     ad = relationship("Ad")
     user = relationship("User")
@@ -132,8 +140,8 @@ class Chat(Base):
 
     id = Column(BigInteger, primary_key=True, nullable=False, index=True)
     ad_id = Column(UUID, ForeignKey("ads.id"))
-    seller_id = Column(Integer)
-    buyer_id = Column(Integer)
+    seller_id = Column(UUID)
+    buyer_id = Column(UUID)
     chat_id = Column(String(64), unique=True, nullable=False)
     marked_del_seller = Column(Boolean, default=False)
     marked_del_buyer = Column(Boolean, default=False)
@@ -166,7 +174,7 @@ class ReportedAd(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     ad_id = Column(UUID, ForeignKey("ads.id"), index=True)
-    reported_by = Column(Integer, ForeignKey("users.id"), index=True)
+    reported_by = Column(UUID, ForeignKey("users.id"), index=True)
     reason = Column(String(100), nullable=False)
     description = Column(String(5000), nullable=False)
     reported_on = Column(DateTime, default=datetime.now)

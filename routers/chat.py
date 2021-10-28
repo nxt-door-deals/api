@@ -19,8 +19,8 @@ from database.models import ChatHistory
 
 class ChatBase(BaseModel):
     ad_id: UUID
-    seller_id: int
-    buyer_id: Optional[int]
+    seller_id: str
+    buyer_id: Optional[str]
 
 
 class ChatMessage(BaseModel):
@@ -29,7 +29,7 @@ class ChatMessage(BaseModel):
 
 
 def get_chat_record(
-    ad_id: UUID, seller_id: int, buyer_id: int, db: Session = Depends(get_db)
+    ad_id: UUID, seller_id: str, buyer_id: str, db: Session = Depends(get_db)
 ):
 
     chat_id = (
@@ -52,8 +52,9 @@ def get_chat_record(
 
 @router.get("/chat")
 def get_chat_details(
-    ad_id: UUID, seller_id: int, buyer_id: int, db: Session = Depends(get_db)
+    ad_id: UUID, seller_id: str, buyer_id: str, db: Session = Depends(get_db)
 ):
+
     chat_id = get_chat_record(ad_id, seller_id, buyer_id, db)
 
     if chat_id:
@@ -64,6 +65,7 @@ def get_chat_details(
 
 @router.post("/chat/create", status_code=status.HTTP_201_CREATED)
 def create_chat(chat: ChatBase, db: Session = Depends(get_db)):
+
     chat_id = hashlib.sha256(secrets.token_hex(64).encode()).hexdigest()
 
     new_chat = Chat(

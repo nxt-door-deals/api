@@ -38,7 +38,7 @@ class ConnectionManager:
         self.active_connections.append(private_chat_list.copy())
 
     async def connect(self, websocket: WebSocket, chat_id: str):
-        """Creates the list of web socket connections. The list of dictonaries, will have
+        """Creates the list of web socket connections. The list of dictionaries, will have
         the chat id and list of private connections as keys.
 
         private_chat_list = {
@@ -142,7 +142,7 @@ def save_chat_message(data: str, chat_id: str, db: Session):
 
 
 async def check_for_new_notifications(
-    user_id: int, request: Request, db: Session = Depends(get_db)
+    user_id: str, request: Request, db: Session = Depends(get_db)
 ):
     chat_ids = (
         db.query(ChatHistory)
@@ -166,7 +166,8 @@ async def check_for_new_notifications(
                 < 60
             ):
                 yield {"data": chat.chat_id}
-            await asyncio.sleep(40)  # Run every 40 seconds
+
+    await asyncio.sleep(120)  # Run every 120 seconds
 
 
 # End points
@@ -174,7 +175,7 @@ async def check_for_new_notifications(
 async def default_websocket(
     websocket: WebSocket,
     chat_id: str,
-    client_id: int,
+    client_id: str,
     db: Session = Depends(get_db),
 ):
 
@@ -202,7 +203,7 @@ async def default_websocket(
 
 @router.get("/new/chats", status_code=status.HTTP_200_OK)
 async def new_chats(
-    user_id: int, request: Request, db: Session = Depends(get_db)
+    user_id: str, request: Request, db: Session = Depends(get_db)
 ):
     event_generator = check_for_new_notifications(user_id, request, db)
     return EventSourceResponse(event_generator)

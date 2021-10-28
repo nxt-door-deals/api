@@ -6,6 +6,7 @@ from datetime import timedelta
 from typing import Optional
 
 from fastapi import Depends
+from fastapi import Header
 from fastapi import HTTPException
 from fastapi import status
 from fastapi.security import OAuth2PasswordBearer
@@ -26,6 +27,8 @@ from . import router
 from database.models import Ad
 from database.models import Apartment
 from database.models import User
+from utils.helpers import generate_id_from_token
+from utils.helpers import verify_id_from_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth")
 
@@ -109,10 +112,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     # sourcery skip: inline-immediately-returned-variable
     to_encode = data.copy()
 
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=1440)
+    expire = datetime.utcnow() + timedelta(
+        minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+    )
 
     to_encode.update({"exp": expire, "iat": datetime.utcnow()})
     encoded_jwt = jwt.encode(
@@ -155,7 +157,7 @@ def get_current_user(
     ad = (
         db.query(User.id, func.count(Ad.id))
         .filter(
-            Ad.posted_by == int(token_data.id),
+            Ad.posted_by == token_data.id,
             Ad.active == True,  # noqa
             cast(Ad.created_on, Date) + tdelta > date.today(),
         )
@@ -182,9 +184,7 @@ def get_current_user(
             Apartment.name,
         )
         .filter(
-            and_(
-                User.id == int(token_data.id), User.apartment_id == Apartment.id
-            )
+            and_(User.id == token_data.id, User.apartment_id == Apartment.id)
         )
         .group_by(
             User.id,
@@ -262,6 +262,7 @@ def login(
     # access_token_expires = timedelta(
     #     minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
     # )
+
     access_token = create_access_token(data={"sub": id})
     reset_invalid_login_counts(form_data.username, db)
     return {"access_token": access_token, "token_type": "bearer"}
@@ -285,5 +286,25 @@ def get_login_counts(email: str, db: Session = Depends(get_db)):
 
 
 @router.get("/auth/current_user", status_code=status.HTTP_200_OK)
-def get_current_user(current_user: UserAuth = Depends(get_current_active_user)):
+def get_current_user(
+    current_user: UserAuth = Depends(get_current_active_user),
+    authorization: str = Header(None),
+):
+    if not generate_id_from_token(authorization, current_user["id"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Session Expired"
+        )
+
     return current_user
+
+
+@router.get("/token/verify", status_code=status.HTTP_200_OK)
+def verify_token_validity(
+    authorization: str = Header(None), db: Session = Depends(get_db)
+):
+    verification_status = verify_id_from_token(authorization, db)
+
+    if not verification_status:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Session Expired"
+        )

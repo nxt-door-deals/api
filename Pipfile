@@ -34,6 +34,7 @@ python-multipart = "*"
 sentry-sdk = "*"
 contentful = "*"
 sse-starlette = "*"
+tinify = "*"
 
 [requires]
 python_version = "3.7"

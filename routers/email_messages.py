@@ -145,7 +145,7 @@ def send_email_otp(
     message.template_id = os.getenv(email.template_name)
 
     try:
-        background_task.add_task(send_message, message)
+        # background_task.add_task(send_message, message)
         return status.HTTP_202_ACCEPTED
     except Exception as e:
         capture_exception(e)
@@ -166,6 +166,27 @@ def send_email_contact(email: EmailSend, background_task: BackgroundTasks):
     try:
         background_task.add_task(send_message, message)
         return "We'll be in touch soon!"
+    except Exception as e:
+        capture_exception(e)
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
+        )
+
+
+@router.post("/email/send/feature", status_code=status.HTTP_202_ACCEPTED)
+def send_email_feature_request(
+    email: EmailSend, background_task: BackgroundTasks
+):
+    # from_email has to be the authenticated sender in Sendgrid
+    message = Mail(
+        from_email=email.from_email,
+        to_emails=email.to_email,
+        subject="You have a feature request!",
+        plain_text_content=email.body,
+    )
+    try:
+        background_task.add_task(send_message, message)
+        return "Message received! Thank you :)"
     except Exception as e:
         capture_exception(e)
         raise HTTPException(
