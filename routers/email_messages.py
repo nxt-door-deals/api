@@ -43,7 +43,7 @@ class EmailSend(BaseModel):
 class NbhEmailSend(EmailSend):
     apartment_name: str
     address1: str
-    address2: str
+    address2: Optional[str]
     city: str
     state: str
     pincode: str
