@@ -380,7 +380,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     if email:
         raise HTTPException(
             status_code=403,
-            detail=f"An account for {user.email} already exists",
+            detail=f"An account for {user.email.lower()} already exists",
         )
 
     new_user = User(
@@ -614,7 +614,7 @@ def verify_user_email(
         )
 
     hash = split_token[0]
-    user_id = int(split_token[1])
+    user_id = split_token[1]
 
     try:
         record = (
