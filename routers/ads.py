@@ -101,7 +101,7 @@ def fix_image_orientation(optimized_image):
 def upload_files_to_s3(
     ad_id: UUID, user_id: str, uploadedImages: List, db: Session
 ):
-    tinify.key = "yg9wF69VzSBYGhBwt61dKs7RkgmJJwV2"
+    tinify.key = os.getenv("TINIFY_KEY")
     tinify.validate()
 
     s3_resource = initialize_s3()

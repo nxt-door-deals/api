@@ -34,7 +34,7 @@ models.Base.metadata.create_all(bind=engine)
 origins = [os.getenv("CORS_ORIGIN_SERVER")]
 
 
-sentry_sdk.init(dsn=os.getenv("SENTRY_DSN"))
+sentry_sdk.init(dsn=os.getenv("SENTRY_DSN"), traces_sample_rate=0.3)
 
 app = FastAPI(docs_url=None, redoc_url=None)
 app.add_middleware(
