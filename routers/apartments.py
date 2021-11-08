@@ -94,7 +94,7 @@ def search_apartment(name: str, db: Session = Depends(get_db)):
         return (
             db.query(Apartment)
             .filter(and_(Apartment.name.ilike(name), Apartment.verified))
-            .limit(4)
+            .limit(3)
             .all()
         )
     except Exception as e:
