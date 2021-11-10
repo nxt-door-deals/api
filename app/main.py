@@ -23,6 +23,7 @@ from routers import (
     websocket_server,
     sitemap,
     rss,
+    jobs,
 )
 
 from starlette.middleware.cors import CORSMiddleware
@@ -60,3 +61,4 @@ app.include_router(chat.router, prefix=prefix)
 app.include_router(websocket_server.router)
 app.include_router(sitemap.router, prefix=prefix)
 app.include_router(rss.router, prefix=prefix)
+app.include_router(jobs.router, prefix=prefix)

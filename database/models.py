@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from datetime import datetime
 
 from sqlalchemy import BigInteger
@@ -201,3 +202,17 @@ class Metric(Base):
 
     def __repr__(self):
         return f"Metric({self.id}, {self.date})"
+
+
+class Job(Base):
+
+    __tablename__ = "jobs"
+
+    job_id = Column(
+        UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4
+    )
+    job_name = Column(String(50), nullable=False)
+    last_run_date = Column(Date, default=date.today)
+
+    def __repr__(self) -> str:
+        return f"Job({self.job_name}, {self.last_run_date})"
