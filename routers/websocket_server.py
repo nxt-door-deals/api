@@ -163,7 +163,7 @@ async def check_for_new_notifications(
             if (
                 chat.history[-1]["sender"] != user_id
                 and ((datetime.now() - chat.last_chat_message).total_seconds())
-                < 60
+                < 120
             ):
                 yield {"data": chat.chat_id}
 
