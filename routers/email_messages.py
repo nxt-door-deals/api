@@ -88,6 +88,16 @@ class ReportedAdEmail(EmailSend):
         }
 
 
+class ChatNotificationEmail(BaseModel):
+    seller_id: str
+    seller_name: str
+    buyer_id: str
+    buyer_name: str
+    seller_email: str
+    ad_id: str
+    ad_name: str
+
+
 # Helpers
 def send_message(message: Mail):
     sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
@@ -282,6 +292,41 @@ def send_reported_ad_email_to_user(
     }
 
     message.template_id = os.getenv(email.template_name)
+
+    try:
+        background_task.add_task(send_message, message)
+        return status.HTTP_202_ACCEPTED
+    except Exception as e:
+        capture_exception(e)
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="The email could not be sent"
+        )
+
+
+# Send chat notification to seller
+@router.post("/email/chat_notification/", status_code=status.HTTP_202_ACCEPTED)
+def send_chat_notifications(
+    email: ChatNotificationEmail, background_task: BackgroundTasks
+):
+    message = Mail(
+        from_email="contact@nxtdoordeals.com", to_emails=email.seller_email
+    )
+
+    origin_server = os.getenv("CORS_ORIGIN_SERVER")
+    chat_url = (
+        f"{origin_server}/chat/{email.ad_id}+{email.seller_id}+{email.buyer_id}"
+    )
+
+    message.dynamic_template_data = {
+        "seller": email.seller_name,
+        "buyer_caps": email.buyer_name.upper(),
+        "buyer": email.buyer_name,
+        "ad_name": email.ad_name,
+        "chat_url": chat_url,
+        "year": datetime.now().year,
+    }
+
+    message.template_id = os.getenv("CHAT_NOTIFICATION_EMAIL_TEMPLATE")
 
     try:
         background_task.add_task(send_message, message)
