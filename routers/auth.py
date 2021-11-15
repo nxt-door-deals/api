@@ -27,6 +27,7 @@ from . import router
 from database.models import Ad
 from database.models import Apartment
 from database.models import User
+from utils.helpers import decrypt_mobile_number
 from utils.helpers import generate_id_from_token
 from utils.helpers import verify_id_from_token
 
@@ -216,12 +217,18 @@ def get_current_user(
 
     user_dict = CurrentUser._make(user)._asdict()
 
+    decrypted_mobile = (
+        decrypt_mobile_number(user_dict["mobile"])
+        if user_dict["mobile"]
+        else None
+    )
+
     return {
         "id": user_dict["id"],
         "name": user_dict["name"],
         "email": user_dict["email"],
         "is_active": user_dict["is_active"],
-        "mobile": user_dict["mobile"],
+        "mobile": decrypted_mobile,
         "mail_subscribed": user_dict["mail_subscribed"],
         "otp": user_dict["otp"],
         "email_verified": user_dict["email_verified"],

@@ -155,7 +155,7 @@ def send_email_otp(
     message.template_id = os.getenv(email.template_name)
 
     try:
-        # background_task.add_task(send_message, message)
+        background_task.add_task(send_message, message)
         return status.HTTP_202_ACCEPTED
     except Exception as e:
         capture_exception(e)

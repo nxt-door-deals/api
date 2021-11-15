@@ -33,9 +33,13 @@ from database.models import LikedAd
 from database.models import ReportedAd
 from database.models import User
 from routers.metrics import metric_counts
+from utils.helpers import decrypt_mobile_number
+from utils.helpers import encrypt_mobile_number
 from utils.helpers import generate_id_from_token
 from utils.helpers import initialize_s3
-from utils.helpers import send_otp_sms
+from utils.helpers import send_sms_with_twilio
+
+# from utils.helpers import send_otp_sms
 
 
 # Schemas
@@ -383,10 +387,14 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
             detail=f"An account for {user.email.lower()} already exists",
         )
 
+    encrypted_mobile = (
+        encrypt_mobile_number(f"+91{user.mobile}") if user.mobile else None
+    )
+
     new_user = User(
         name=user.name.title(),
         email=user.email.lower(),
-        mobile=user.mobile,
+        mobile=encrypted_mobile,
         hashed_password=hashed_password,
         apartment_id=user.apartment_id,
         apartment_number=user.apartment_number,
@@ -436,7 +444,6 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         "password": new_user.hashed_password,
         "apartment_id": new_user.apartment_id,
         "apartment_number": new_user.apartment_number,
-        "mobile": new_user.mobile,
         "access_token": token,
         "email_verification_hash": email_verification_hash,
     }
@@ -508,12 +515,18 @@ def update_user(
 
     user_to_update = user.dict()
 
+    encrypted_mobile = (
+        encrypt_mobile_number(user_to_update["mobile"])
+        if user_to_update["mobile"]
+        else None
+    )
+
     try:
         db.query(User).filter(User.id == user_id).update(
             {
                 User.name: user_to_update["name"].title(),
                 User.email: user_to_update["email"].lower(),
-                User.mobile: user_to_update["mobile"],
+                User.mobile: encrypted_mobile,
                 User.apartment_id: user_to_update["apartment_id"],
                 User.apartment_number: user_to_update["apartment_number"],
             }
@@ -700,8 +713,10 @@ def generate_otp(user: UserOtpBase, db: Session = Depends(get_db)):
             detail="Too many invalid otp's. Please enter your email again",
         )
 
-    if record.lock_otp_send and datetime.utcnow() > record.otp_locked_timestamp + timedelta(
-        minutes=10
+    if (
+        record.lock_otp_send
+        and datetime.utcnow()
+        > record.otp_locked_timestamp + timedelta(minutes=10)
     ):
         reset_otp_count(email, db)
 
@@ -723,7 +738,9 @@ def generate_otp(user: UserOtpBase, db: Session = Depends(get_db)):
         record = db.query(User).filter(User.email == email).first()
 
         if record.mobile:
-            send_otp_sms(otp, record.mobile)
+            # send_otp_sms(otp, record.mobile)
+            decrypted_mobile = decrypt_mobile_number(record.mobile)
+            send_sms_with_twilio(otp, decrypted_mobile)
 
         increment_generated_otp_count(email, record.otp_generated_count, db)
 
@@ -761,8 +778,8 @@ def verify_otp(
             detail="Too many invalid otp's. Please enter your email again",
         )
 
-    saved_otp_verification_timestamp = record.otp_verification_timestamp.replace(
-        tzinfo=pytz.UTC
+    saved_otp_verification_timestamp = (
+        record.otp_verification_timestamp.replace(tzinfo=pytz.UTC)
     )
 
     date_diff = timestamp - saved_otp_verification_timestamp

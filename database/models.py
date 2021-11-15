@@ -27,7 +27,7 @@ class User(Base):
     )
     name = Column(String(100), nullable=False)
     email = Column(String(50), unique=True, nullable=False, index=True)
-    mobile = Column(String(15))
+    mobile = Column(String(200))
     hashed_password = Column(String(200), nullable=False)
     is_active = Column(Boolean, default=True)
     apartment_id = Column(Integer, ForeignKey("apartments.id"))

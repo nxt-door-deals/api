@@ -3,11 +3,17 @@ import re
 from datetime import datetime
 
 import boto3
-import requests
+from cryptography.fernet import Fernet
 from jose import jwt
 from sqlalchemy.orm import Session
+from twilio.rest import Client
 
 from database.models import User
+
+# import requests
+
+key = bytes(os.getenv("ENCRYPTION_KEY"), "utf-8")
+fernet = Fernet(key)
 
 
 def address_formatter(address):
@@ -100,16 +106,36 @@ def verify_id_from_token(token: str, db: Session):
     return saved_id and not has_token_expired
 
 
-def send_otp_sms(otp: str, mobile: str):
-    url = os.getenv("FAST2SMS_API_URL")
+# def send_otp_sms(otp: str, mobile: str):
+#     url = os.getenv("FAST2SMS_API_URL")
 
-    payload = f"variables_values={otp}&route=otp&numbers={mobile}"
-    headers = {
-        "authorization": os.getenv("FAST2SMS_API_KEY"),
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Cache-Control": "no-cache",
-    }
+#     payload = f"variables_values={otp}&route=otp&numbers={mobile}"
+#     headers = {
+#         "authorization": os.getenv("FAST2SMS_API_KEY"),
+#         "Content-Type": "application/x-www-form-urlencoded",
+#         "Cache-Control": "no-cache",
+#     }
 
-    response = requests.request("POST", url, data=payload, headers=headers)
+# response = requests.request("POST", url, data=payload, headers=headers)
 
-    print(response.text)
+
+def send_sms_with_twilio(otp: str, mobile: str):
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    client = Client(account_sid, auth_token)
+
+    client.messages.create(
+        body=f"Otp to reset your nxtdoordeals.com password - {otp}",
+        from_=os.getenv("TWILIO_PHONE_NUMBER"),
+        to=mobile,
+    )
+
+
+def encrypt_mobile_number(mobile: str):
+    encrypted_mobile = fernet.encrypt(mobile.encode())
+    return encrypted_mobile.decode("utf-8")
+
+
+def decrypt_mobile_number(encrypted_mobile: str):
+    encrypted_mobile = bytes(encrypted_mobile, "utf-8")
+    return fernet.decrypt(encrypted_mobile).decode()

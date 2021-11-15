@@ -34,6 +34,8 @@ sentry-sdk = "*"
 contentful = "*"
 sse-starlette = "*"
 tinify = "*"
+twilio = "*"
+cryptography = "*"
 
 [requires]
 python_version = "3.8"
