@@ -516,7 +516,7 @@ def update_user(
     user_to_update = user.dict()
 
     encrypted_mobile = (
-        encrypt_mobile_number(user_to_update["mobile"])
+        encrypt_mobile_number(f"+91{user_to_update['mobile']}")
         if user_to_update["mobile"]
         else None
     )
