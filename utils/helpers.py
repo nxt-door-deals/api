@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 
 import boto3
+import requests
 from cryptography.fernet import Fernet
 from jose import jwt
 from sqlalchemy.orm import Session
@@ -131,6 +132,18 @@ def send_sms_with_twilio(otp: str, mobile: str):
     )
 
 
+def send_ad_interest_sms_with_twilio(mobile: str, message: str):
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    client = Client(account_sid, auth_token)
+
+    client.messages.create(
+        body=message,
+        from_=os.getenv("TWILIO_PHONE_NUMBER"),
+        to=mobile,
+    )
+
+
 def encrypt_mobile_number(mobile: str):
     encrypted_mobile = fernet.encrypt(mobile.encode())
     return encrypted_mobile.decode("utf-8")
@@ -139,3 +152,16 @@ def encrypt_mobile_number(mobile: str):
 def decrypt_mobile_number(encrypted_mobile: str):
     encrypted_mobile = bytes(encrypted_mobile, "utf-8")
     return fernet.decrypt(encrypted_mobile).decode()
+
+
+def shorten_url(url: str):
+    cuttly_api_key = os.getenv("CUTTLY_API_KEY")
+
+    shortened_url = requests.get(
+        f"https://cutt.ly/api/api.php?key={cuttly_api_key}&short={url}"
+    ).json()["url"]
+
+    if shortened_url["status"] == 7:
+        return shortened_url["shortLink"]
+    else:
+        return False

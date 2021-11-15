@@ -66,7 +66,7 @@ class AdsBase(BaseModel):
 
 class ReportAd(BaseModel):
     ad_id: UUID
-    reported_by: int
+    reported_by: str
     reason: str
     description: str
 

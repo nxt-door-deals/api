@@ -37,7 +37,9 @@ from utils.helpers import decrypt_mobile_number
 from utils.helpers import encrypt_mobile_number
 from utils.helpers import generate_id_from_token
 from utils.helpers import initialize_s3
+from utils.helpers import send_ad_interest_sms_with_twilio
 from utils.helpers import send_sms_with_twilio
+from utils.helpers import shorten_url
 
 # from utils.helpers import send_otp_sms
 
@@ -131,6 +133,16 @@ class UserOtpBase(BaseModel):
     class Config:
         orm_mode = True
         schema_extra = {"example": {"id": 1, "email": "JohnDoe@email.com"}}
+
+
+class SellerSms(BaseModel):
+    seller_id: str
+    seller_name: str
+    buyer_id: str
+    buyer_name: str
+    ad_id: str
+    ad_name: str
+    mobile: str
 
 
 # Helpers
@@ -1002,3 +1014,31 @@ def update_number_sold(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not update the number sold",
         )
+
+
+@router.post("/seller/sms", status_code=status.HTTP_201_CREATED)
+async def send_sms_to_seller_on_ad_interest(
+    sms: SellerSms,
+    authorization: str = Header(None),
+):
+    if not generate_id_from_token(authorization, sms.buyer_id):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Session Expired"
+        )
+
+    try:
+        url_to_shorten = (
+            os.getenv("CORS_ORIGIN_SERVER")
+            + f"/chat/{sms.seller_id}+{sms.buyer_id}+{sms.ad_id}"
+        )
+
+        cuttly_short_url = shorten_url(url_to_shorten)
+
+        if not cuttly_short_url:
+            cuttly_short_url = url_to_shorten
+
+        message = f"{sms.buyer_name} has expressed an interest in your nxtdoordeals.com ad - {sms.ad_name}. Chat with {sms.buyer_name} - {cuttly_short_url}"
+
+        send_ad_interest_sms_with_twilio(sms.mobile, message)
+    except Exception as e:
+        capture_exception(e)
