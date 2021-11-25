@@ -17,6 +17,16 @@ key = bytes(os.getenv("ENCRYPTION_KEY"), "utf-8")
 fernet = Fernet(key)
 
 
+def get_user_initial(name):
+    split_name = name.split(" ")
+
+    if len(split_name) == 1:
+        return name[0].upper() + name[1].upper()
+
+    if len(split_name) > 1:
+        return split_name[0][0].upper() + split_name[1][0].upper()
+
+
 def address_formatter(address):
     # We don't need numbers with st, nd, rd or th in title case
     address_regex_pattern = re.compile(

@@ -36,6 +36,7 @@ from routers.metrics import metric_counts
 from utils.helpers import decrypt_mobile_number
 from utils.helpers import encrypt_mobile_number
 from utils.helpers import generate_id_from_token
+from utils.helpers import get_user_initial
 from utils.helpers import initialize_s3
 from utils.helpers import send_ad_interest_sms_with_twilio
 from utils.helpers import send_sms_with_twilio
@@ -399,9 +400,11 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
             detail=f"An account for {user.email.lower()} already exists",
         )
 
-    encrypted_mobile = (
-        encrypt_mobile_number(f"+91{user.mobile}") if user.mobile else None
+    mobile = (
+        user.mobile if user.mobile.startswith("+91") else f"+91{user.mobile}"
     )
+
+    encrypted_mobile = encrypt_mobile_number(mobile) if user.mobile else None
 
     new_user = User(
         name=user.name.title(),
@@ -527,10 +530,16 @@ def update_user(
 
     user_to_update = user.dict()
 
+    user_to_update["initial"] = get_user_initial(user_to_update["name"])
+
+    mobile = (
+        user_to_update["mobile"]
+        if user_to_update["mobile"].startswith("+91")
+        else f"+91{user_to_update['mobile']}"
+    )
+
     encrypted_mobile = (
-        encrypt_mobile_number(f"+91{user_to_update['mobile']}")
-        if user_to_update["mobile"]
-        else None
+        encrypt_mobile_number(mobile) if user_to_update["mobile"] else None
     )
 
     try:

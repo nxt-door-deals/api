@@ -29,6 +29,7 @@ from database.models import Apartment
 from database.models import User
 from utils.helpers import decrypt_mobile_number
 from utils.helpers import generate_id_from_token
+from utils.helpers import get_user_initial
 from utils.helpers import verify_id_from_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth")
@@ -223,9 +224,12 @@ def get_current_user(
         else None
     )
 
+    user_initial = get_user_initial(user_dict["name"])
+
     return {
         "id": user_dict["id"],
         "name": user_dict["name"],
+        "initial": user_initial,
         "email": user_dict["email"],
         "is_active": user_dict["is_active"],
         "mobile": decrypted_mobile,
