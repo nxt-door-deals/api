@@ -27,10 +27,17 @@ def get_user_initial(name):
         return split_name[0][0].upper() + split_name[1][0].upper()
 
 
+# Remove excess spaces between words in a name
+def name_checker(name):
+    name_filter = [n for n in name.split(" ") if n != ""]
+
+    return " ".join(name_filter)
+
+
 def address_formatter(address):
     # We don't need numbers with st, nd, rd or th in title case
     address_regex_pattern = re.compile(
-        r"([\d]+st)|([\d]+nd)|([\d]+rd)|([\d]+th)"
+        r"([\d]+st)|([\d]+nd)|([\d]+rd)|([\d]+th)", re.IGNORECASE
     )
 
     matched_address = re.search(address_regex_pattern, address)
@@ -38,8 +45,10 @@ def address_formatter(address):
     if not matched_address:
         return address.title().strip()
 
+    # Don't title case an address starting with 1st, 2nd, 3rd, 4th etc...
+    # We don't want it to look like 1St, 2Nd, 3Rd, 4Th etc...
     formatted_address = [
-        a.title() if a != matched_address.group() else a
+        a.title().strip() if a != matched_address.group() else a.lower().strip()
         for a in address.split(" ")
     ]
     return " ".join(formatted_address)

@@ -16,6 +16,7 @@ from . import router
 from database.models import Apartment
 from routers.metrics import metric_counts
 from utils.helpers import address_formatter
+from utils.helpers import name_checker
 
 
 # Schema
@@ -117,8 +118,10 @@ def add_apartment(apartment: ApartmentCreate, db: Session = Depends(get_db)):
     if apartment.address2:
         address2_title = address_formatter(apartment.address2)
 
+    apartment_name = name_checker(apartment.name)
+
     new_apartment = Apartment(
-        name=apartment.name.title().strip(),
+        name=apartment_name.title(),
         address1=address1_title.strip(),
         address2=address2_title if apartment.address2 else None,
         city=apartment.city.title().strip(),
