@@ -365,11 +365,15 @@ def fetch_user(
     try:
         fetched_user = db.query(User).filter(User.id == user_id).first()
 
+        if fetched_user.mobile:
+            # send_otp_sms(otp, record.mobile)
+            decrypted_mobile = decrypt_mobile_number(fetched_user.mobile)
+
         if fetched_user:
             return {
                 "name": fetched_user.name,
                 "email": fetched_user.email,
-                # "mobile": fetched_user.mobile,
+                "mobile": decrypted_mobile if fetched_user.mobile else None,
                 "apartment_id": fetched_user.apartment_id,
                 "active_status": fetched_user.is_active,
             }
