@@ -115,6 +115,8 @@ class AdImage(Base):
     id = Column(BigInteger, primary_key=True, nullable=False, index=True)
     ad_id = Column(UUID, ForeignKey("ads.id"))
     image_path = Column(String(500), nullable=False)
+    image_height = Column(Integer)
+    image_width = Column(Integer)
 
     image = relationship("Ad")
 

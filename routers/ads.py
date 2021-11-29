@@ -122,12 +122,12 @@ def upload_files_to_s3(
         #     optimized_image.width < image_size[0]
         #     or optimized_image.height < image_size[1]
         # ):
-        image_size = (
-            int(optimized_image.width / 1.5),
-            int(optimized_image.height / 1.5),
-        )
+        # image_size = (
+        #     int(optimized_image.width / 1.5),
+        #     int(optimized_image.height / 1.5),
+        # )
 
-        optimized_image = optimized_image.resize(image_size)
+        # optimized_image = optimized_image.resize(image_size)
 
         in_mem_file = io.BytesIO()
         optimized_image.save(
@@ -152,10 +152,15 @@ def upload_files_to_s3(
 
         url_prefix = os.getenv("IMAGEKIT_URL_PREFIX")
 
+        image_width = int(round(optimized_image.width / 1.5))
+        image_height = int(round(optimized_image.height / 1.5))
+
         # Make an entry in the database
         new_ad = AdImage(
             ad_id=str(ad_id),
-            image_path=f"{url_prefix}/users/{user_id}/ads/{str(ad_id)}/{file_name}{file_ext}",
+            image_path=f"{url_prefix}/users/{user_id}/ads/{str(ad_id)}/{file_name}{file_ext}/tr:w-{image_width},h-{image_height}",
+            image_width=image_width,
+            image_height=image_height,
         )
         db.add(new_ad)
     try:
@@ -173,7 +178,9 @@ def upload_files_to_s3(
 
 def get_images_from_s3(ad_id: UUID, db: Session):
     return (
-        db.query(AdImage.image_path).filter(AdImage.ad_id == str(ad_id)).all()
+        db.query(AdImage.image_path, AdImage.image_height, AdImage.image_width)
+        .filter(AdImage.ad_id == str(ad_id))
+        .all()
     )
 
 
@@ -223,7 +230,14 @@ def get_ads(records: List, db: Session):
             ad_data["title"] = record.title
             ad_data["price"] = formatted_price
             ad_data["date_posted"] = get_posted_days(record.created_on)
-            ad_data["images"] = [image["image_path"] for image in ad_images]
+            ad_data["images"] = [
+                {
+                    "image_path": image["image_path"],
+                    "image_width": image["image_width"],
+                    "image_height": image["image_height"],
+                }
+                for image in ad_images
+            ]
             ad_data["ad_type"] = record.ad_type
             ad_data["ad_category"] = record.ad_category
             ad_data["condition"] = record.condition
@@ -387,7 +401,14 @@ def get_ad_details_from_id(id: UUID, db: Session = Depends(get_db)):
         ad["available_from"] = available_from
         ad["available_from_date"] = ad_record.available_from
         ad["sold"] = ad_record.sold
-        ad["images"] = [image["image_path"] for image in ad_images]
+        ad["images"] = [
+            {
+                "image_path": image["image_path"],
+                "image_width": image["image_width"],
+                "image_height": image["image_height"],
+            }
+            for image in ad_images
+        ]
         ad["apartment_id"] = ad_record.apartment_id
         ad["apartment_name"] = neighbourhood.name
         ad["flat_no"] = (
