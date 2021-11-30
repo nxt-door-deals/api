@@ -154,15 +154,15 @@ def upload_files_to_s3(
 
         if optimized_image.width > 1900:
             image_width = int(round(optimized_image.width / 3))
-        elif optimized_image.width > 800:
-            image_width = int(round(optimized_image.width / 1.6))
+        elif optimized_image.width > 900:
+            image_width = int(round(optimized_image.width / 1.5))
         else:
             image_width = int(round(optimized_image.width))
 
         if optimized_image.height > 1900:
             image_height = int(round(optimized_image.height / 3))
-        elif optimized_image.height > 800:
-            image_height = int(round(optimized_image.height / 1.6))
+        elif optimized_image.height > 900:
+            image_height = int(round(optimized_image.height / 1.5))
         else:
             image_height = int(round(optimized_image.height))
 
