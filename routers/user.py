@@ -1042,7 +1042,7 @@ async def send_sms_to_seller_on_ad_interest(
     try:
         url_to_shorten = (
             os.getenv("CORS_ORIGIN_SERVER")
-            + f"/chat/{sms.seller_id}+{sms.buyer_id}+{sms.ad_id}"
+            + f"/chat/{sms.ad_id}+{sms.seller_id}+{sms.buyer_id}"
         )
 
         cuttly_short_url = shorten_url(url_to_shorten)
