@@ -174,13 +174,14 @@ def decrypt_mobile_number(encrypted_mobile: str):
 
 
 def shorten_url(url: str):
-    cuttly_api_key = os.getenv("CUTTLY_API_KEY")
+    tiny_url_api_key = os.getenv("TINY_URL_API_KEY")
 
-    shortened_url = requests.get(
-        f"https://cutt.ly/api/api.php?key={cuttly_api_key}&short={url}"
-    ).json()["url"]
+    shortened_url = requests.post(
+        f"https://api.tinyurl.com/create?api_token={tiny_url_api_key}",
+        data={"url": url, "domain": "tiny.one"},
+    )
 
-    if shortened_url["status"] == 7:
-        return shortened_url["shortLink"]
+    if shortened_url.status_code == 200:
+        return shortened_url.json()["data"]["tiny_url"]
     else:
         return False

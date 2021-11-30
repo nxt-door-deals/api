@@ -42,8 +42,6 @@ from utils.helpers import send_ad_interest_sms_with_twilio
 from utils.helpers import send_sms_with_twilio
 from utils.helpers import shorten_url
 
-# from utils.helpers import send_otp_sms
-
 
 # Schemas
 class UserBase(BaseModel):
@@ -360,7 +358,6 @@ def validate_email(email: str, db: Session = Depends(get_db)):
 def fetch_user(
     user_id: str,
     db: Session = Depends(get_db),
-    authorization: str = Header(None),
 ):
     try:
         fetched_user = db.query(User).filter(User.id == user_id).first()
@@ -1040,17 +1037,17 @@ async def send_sms_to_seller_on_ad_interest(
         )
 
     try:
-        url_to_shorten = (
+        chat_url = (
             os.getenv("CORS_ORIGIN_SERVER")
             + f"/chat/{sms.ad_id}+{sms.seller_id}+{sms.buyer_id}"
         )
 
-        cuttly_short_url = shorten_url(url_to_shorten)
+        tiny_url = shorten_url(chat_url)
 
-        if not cuttly_short_url:
-            cuttly_short_url = url_to_shorten
+        if not tiny_url:
+            tiny_url = chat_url
 
-        message = f"{sms.buyer_name} has expressed an interest in your nxtdoordeals.com ad - {sms.ad_name}. Chat with {sms.buyer_name} - {cuttly_short_url}"
+        message = f"{sms.buyer_name} has expressed an interest in your nxtdoordeals.com ad - {sms.ad_name}. Chat with {sms.buyer_name} - {tiny_url}"
 
         send_ad_interest_sms_with_twilio(sms.mobile, message)
     except Exception as e:
