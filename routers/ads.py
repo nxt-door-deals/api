@@ -153,16 +153,16 @@ def upload_files_to_s3(
         url_prefix = os.getenv("IMAGEKIT_URL_PREFIX")
 
         if optimized_image.width > 1900:
-            image_width = int(round(optimized_image.width / 2.5))
+            image_width = int(round(optimized_image.width / 3))
         elif optimized_image.width > 800:
-            image_width = int(round(optimized_image.width / 1.5))
+            image_width = int(round(optimized_image.width / 1.6))
         else:
             image_width = int(round(optimized_image.width))
 
         if optimized_image.height > 1900:
-            image_height = int(round(optimized_image.height / 2.5))
+            image_height = int(round(optimized_image.height / 3))
         elif optimized_image.height > 800:
-            image_height = int(round(optimized_image.height / 1.5))
+            image_height = int(round(optimized_image.height / 1.6))
         else:
             image_height = int(round(optimized_image.height))
 
