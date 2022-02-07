@@ -169,7 +169,7 @@ def upload_files_to_s3(
         # Make an entry in the database
         new_ad = AdImage(
             ad_id=str(ad_id),
-            image_path=f"{url_prefix}/users/{user_id}/ads/{str(ad_id)}/{file_name}{file_ext}/tr:w-{image_width},h-{image_height}",
+            image_path=f"{url_prefix}/users/{user_id}/ads/{str(ad_id)}/{file_name}{file_ext}",
             image_width=image_width,
             image_height=image_height,
         )
